@@ -13,11 +13,66 @@ import {
   generateRoutine,
   getNextClarifyingField,
   mergeRequestDraft,
+  normalizeRequest,
   parseRequestText,
   replaceExerciseInRoutine,
 } from '../utils/workoutGenerator.js';
 import { saveRoutine } from '../services/storageService.js';
 import { exportRoutinePdf } from '../utils/pdfExport.js';
+
+const MUSCLE_OPTIONS = [
+  'chest',
+  'back',
+  'shoulders',
+  'biceps',
+  'triceps',
+  'quadriceps',
+  'hamstrings',
+  'glutes',
+  'calves',
+  'core',
+  'upper',
+  'lower',
+  'push',
+  'pull',
+  'full_body',
+];
+
+const EQUIPMENT_OPTIONS = [
+  'none',
+  'dumbbells',
+  'barbell',
+  'bands',
+  'kettlebell',
+  'exercise_ball',
+  'medicine_ball',
+  'machines',
+];
+
+const TIME_OPTIONS = [
+  { label: '4 ejercicios', value: { exerciseCount: 4, time: null } },
+  { label: '6 ejercicios', value: { exerciseCount: 6, time: null } },
+  { label: '8 ejercicios', value: { exerciseCount: 8, time: null } },
+  { label: '10 ejercicios', value: { exerciseCount: 10, time: null } },
+  { label: '12 ejercicios', value: { exerciseCount: 12, time: null } },
+  { label: '30 min', value: { time: 30, exerciseCount: null } },
+  { label: '45 min', value: { time: 45, exerciseCount: null } },
+  { label: '60 min', value: { time: 60, exerciseCount: null } },
+];
+
+const LEVEL_OPTIONS = [
+  { key: 'beginner', es: 'Principiante', en: 'Beginner' },
+  { key: 'intermediate', es: 'Intermedio', en: 'Intermediate' },
+  { key: 'advanced', es: 'Avanzado', en: 'Advanced' },
+];
+
+const GOAL_OPTIONS = [
+  { key: 'strength', es: 'Fuerza', en: 'Strength' },
+  { key: 'hypertrophy', es: 'Hipertrofia', en: 'Hypertrophy' },
+  { key: 'endurance', es: 'Resistencia', en: 'Endurance' },
+  { key: 'fatloss', es: 'Pérdida de grasa', en: 'Fat loss' },
+  { key: 'mobility', es: 'Movilidad', en: 'Mobility' },
+];
 
 export function ChatPage() {
   const { t, lang } = useLanguage();
@@ -78,7 +133,7 @@ export function ChatPage() {
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages, routine]);
+  }, [messages, routine, pendingField]);
 
   async function handleFreeText() {
     const text = input.trim();
@@ -89,22 +144,28 @@ export function ChatPage() {
     setMessages((m) => [...m, { role: 'user', text }]);
 
     const parsed = parseRequestText(text);
+
     const combined = pendingField
       ? applyAnswerToClarifyingField(draftRequest || {}, parsed, pendingField, text)
       : draftRequest
         ? mergeRequestDraft(draftRequest, parsed)
         : parsed;
 
-    const nextField = getNextClarifyingField(combined);
+    await continueFlow(combined, combined.condition || text);
+  }
+
+  async function continueFlow(request, conditionText = '') {
+    const normalized = normalizeRequest(request);
+    const nextField = getNextClarifyingField(normalized);
 
     if (nextField) {
-      setDraftRequest(combined);
+      setDraftRequest(normalized);
       setPendingField(nextField);
       setMessages((m) => [
         ...m,
         {
           role: 'assistant',
-          text: buildClarifyingQuestion(combined, lang, nextField),
+          text: buildClarifyingQuestion(normalized, lang, nextField),
         },
       ]);
 
@@ -113,7 +174,60 @@ export function ChatPage() {
 
     setDraftRequest(null);
     setPendingField(null);
-    await generateFromRequest(combined, combined.condition || text);
+    await generateFromRequest(normalized, conditionText || normalized.condition || '');
+  }
+
+  async function handleQuickAnswer(field, value, label) {
+    const base = draftRequest || {};
+    let next = { ...base };
+
+    if (field === 'muscles') {
+      next = {
+        ...next,
+        muscles: value,
+        muscle: value[0] || 'full_body',
+        muscleStatus: 'selected',
+      };
+    }
+
+    if (field === 'time') {
+      next = {
+        ...next,
+        ...value,
+      };
+    }
+
+    if (field === 'level') {
+      next = {
+        ...next,
+        level: value,
+      };
+    }
+
+    if (field === 'goal') {
+      next = {
+        ...next,
+        goal: value,
+      };
+    }
+
+    if (field === 'equipment') {
+      next = {
+        ...next,
+        equipment: value,
+      };
+    }
+
+    if (field === 'condition') {
+      next = {
+        ...next,
+        conditionStatus: value === 'none' ? 'none' : 'described',
+        condition: value === 'none' ? '' : value,
+      };
+    }
+
+    setMessages((m) => [...m, { role: 'user', text: label }]);
+    await continueFlow(next, next.condition || '');
   }
 
   async function handleGuided(values) {
@@ -123,6 +237,7 @@ export function ChatPage() {
 
     const normalizedValues = {
       ...values,
+      muscleStatus: 'selected',
       conditionStatus: values.condition ? 'described' : 'none',
     };
 
@@ -136,7 +251,7 @@ export function ChatPage() {
     setBusy(true);
 
     try {
-      await new Promise((r) => setTimeout(r, 350));
+      await new Promise((r) => setTimeout(r, 250));
 
       let exercisePool = pool;
 
@@ -228,6 +343,17 @@ export function ChatPage() {
           </ChatMessage>
         ))}
 
+        {pendingField && !busy && (
+          <QuickReplyPanel
+            key={pendingField}
+            field={pendingField}
+            request={draftRequest}
+            lang={lang}
+            t={t}
+            onAnswer={handleQuickAnswer}
+          />
+        )}
+
         {busy && (
           <ChatMessage role="assistant">
             <span className="inline-flex items-center gap-2">
@@ -313,6 +439,208 @@ export function ChatPage() {
       </div>
     </div>
   );
+}
+
+function QuickReplyPanel({ field, request, lang, t, onAnswer }) {
+  const [selected, setSelected] = useState(() => {
+    if (field === 'equipment') {
+      const eq = request?.equipment || [];
+      return Array.isArray(eq) && !eq.includes('any') ? eq : [];
+    }
+
+    if (field === 'muscles') {
+      const muscles = request?.muscles || [];
+      return Array.isArray(muscles) ? muscles : [];
+    }
+
+    return [];
+  });
+
+  function labelForMuscle(key) {
+    return t.form?.muscles?.[key] || key;
+  }
+
+  function labelForEquipment(key) {
+    if (key === 'none') return lang === 'es' ? 'Peso corporal' : 'Bodyweight';
+    return t.form?.equipments?.[key] || key;
+  }
+
+  function toggleMulti(value, allValue = null) {
+    setSelected((prev) => {
+      if (allValue && value === allValue) return [allValue];
+
+      const withoutAll = allValue ? prev.filter((x) => x !== allValue) : prev;
+      const exists = withoutAll.includes(value);
+      const next = exists ? withoutAll.filter((x) => x !== value) : [...withoutAll, value];
+
+      return next;
+    });
+  }
+
+  if (field === 'muscles') {
+    return (
+      <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-3">
+        <div className="mb-2 font-display text-xs uppercase tracking-wider text-neutral-400">
+          {lang === 'es' ? 'Selecciona músculos' : 'Select muscles'}
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          {MUSCLE_OPTIONS.map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => toggleMulti(m, 'full_body')}
+              className={`chip ${selected.includes(m) ? 'chip-active' : ''}`}
+            >
+              {labelForMuscle(m)}
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          disabled={selected.length === 0}
+          onClick={() =>
+            onAnswer(
+              'muscles',
+              selected,
+              selected.map(labelForMuscle).join(' + '),
+            )
+          }
+          className="btn-primary mt-3 w-full py-2 text-sm disabled:opacity-40"
+        >
+          {lang === 'es' ? 'Confirmar músculos' : 'Confirm muscles'}
+        </button>
+      </div>
+    );
+  }
+
+  if (field === 'time') {
+    return (
+      <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-3">
+        <div className="flex flex-wrap gap-1.5">
+          {TIME_OPTIONS.map((opt) => (
+            <button
+              key={opt.label}
+              type="button"
+              onClick={() => onAnswer('time', opt.value, opt.label)}
+              className="chip"
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (field === 'level') {
+    return (
+      <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-3">
+        <div className="flex flex-wrap gap-1.5">
+          {LEVEL_OPTIONS.map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => onAnswer('level', opt.key, opt[lang] || opt.en)}
+              className="chip"
+            >
+              {opt[lang] || opt.en}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (field === 'goal') {
+    return (
+      <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-3">
+        <div className="flex flex-wrap gap-1.5">
+          {GOAL_OPTIONS.map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => onAnswer('goal', opt.key, opt[lang] || opt.en)}
+              className="chip"
+            >
+              {opt[lang] || opt.en}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (field === 'equipment') {
+    return (
+      <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-3">
+        <div className="mb-2 font-display text-xs uppercase tracking-wider text-neutral-400">
+          {lang === 'es' ? 'Selecciona equipo disponible' : 'Select available equipment'}
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          {EQUIPMENT_OPTIONS.map((e) => (
+            <button
+              key={e}
+              type="button"
+              onClick={() => toggleMulti(e)}
+              className={`chip ${selected.includes(e) ? 'chip-active' : ''}`}
+            >
+              {labelForEquipment(e)}
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          disabled={selected.length === 0}
+          onClick={() =>
+            onAnswer(
+              'equipment',
+              selected,
+              selected.map(labelForEquipment).join(' + '),
+            )
+          }
+          className="btn-primary mt-3 w-full py-2 text-sm disabled:opacity-40"
+        >
+          {lang === 'es' ? 'Confirmar equipo' : 'Confirm equipment'}
+        </button>
+      </div>
+    );
+  }
+
+  if (field === 'condition') {
+    return (
+      <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-3">
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={() => onAnswer('condition', 'none', lang === 'es' ? 'Sin lesiones' : 'No injuries')}
+            className="chip"
+          >
+            {lang === 'es' ? 'Sin lesiones' : 'No injuries'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              onAnswer(
+                'condition',
+                lang === 'es' ? 'dolor o lesión no especificada' : 'unspecified pain or injury',
+                lang === 'es' ? 'Tengo una lesión / dolor' : 'I have pain / injury',
+              )
+            }
+            className="chip"
+          >
+            {lang === 'es' ? 'Tengo lesión/dolor' : 'Pain/injury'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 function buildRoutineSummary(result, lang) {
