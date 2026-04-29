@@ -1,4 +1,4 @@
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import { translations } from '../data/translations.js';
 import { CONDITIONS } from '../data/conditions.js';
 
