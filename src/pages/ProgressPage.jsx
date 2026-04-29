@@ -6,6 +6,27 @@ import {
   addBodyMetric,
 } from '../services/storageService.js';
 
+function formatDate(iso, lang) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleString(lang === 'es' ? 'es-ES' : 'en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatDateShort(iso, lang) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString(lang === 'es' ? 'es-ES' : 'en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
 export function ProgressPage() {
   const { t, lang } = useLanguage();
   const [logs, setLogs] = useState([]);
@@ -57,6 +78,12 @@ export function ProgressPage() {
 
         <Sparkline points={body.slice(0, 30).map((b) => b.weight).reverse()} />
 
+        {body[0] && (
+          <div className="mt-1 text-right font-mono text-[11px] text-neutral-500">
+            {formatDate(body[0].measured_at, lang)}
+          </div>
+        )}
+
         <div className="mt-3 flex gap-2">
           <input
             inputMode="decimal"
@@ -77,6 +104,26 @@ export function ProgressPage() {
             +
           </button>
         </div>
+
+        {body.length > 1 && (
+          <details className="mt-3">
+            <summary className="cursor-pointer font-display text-[11px] uppercase tracking-wider text-neutral-500">
+              {t.progress.bodyWeightHistory} ({body.length})
+            </summary>
+            <ul className="mt-2 divide-y divide-white/5">
+              {body.slice(0, 30).map((b) => (
+                <li key={b.id} className="flex items-center justify-between py-2 text-sm">
+                  <span className="font-mono text-[11px] text-neutral-500">
+                    {formatDate(b.measured_at, lang)}
+                  </span>
+                  <span className="font-mono text-neon-300">
+                    {b.weight} {b.unit}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       </section>
 
       {/* Recent logs */}
@@ -96,12 +143,7 @@ export function ProgressPage() {
                 <div className="min-w-0">
                   <div className="truncate text-sm text-neutral-100">{log.exercise_name}</div>
                   <div className="font-mono text-[11px] text-neutral-500">
-                    {new Date(log.logged_at).toLocaleString(lang === 'es' ? 'es-ES' : 'en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
+                    {formatDate(log.logged_at, lang)}
                   </div>
                 </div>
                 <div className="ml-3 text-right">
@@ -145,7 +187,14 @@ function Sparkline({ points }) {
         </linearGradient>
       </defs>
       <path d={`${path} L ${w} ${h} L 0 ${h} Z`} fill="url(#spark)" />
-      <path d={path} fill="none" stroke="#1fe87a" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d={path}
+        fill="none"
+        stroke="#1fe87a"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

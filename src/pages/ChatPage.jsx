@@ -188,11 +188,11 @@ export function ChatPage() {
 
 function formatRequestSummary(v, t) {
   const parts = [
-    t.form.goals[v.goal],
-    t.form.muscles[v.muscle],
-    t.form.equipments[v.equipment],
+    t.form.goals[v.goal] || v.goal,
+    t.form.muscles[v.muscle] || v.muscle,
+    t.form.equipments[v.equipment] || v.equipment,
     `${v.time}${t.common.minutes}`,
-    t.form.levels[v.level],
+    t.form.levels[v.level] || v.level,
   ];
   if (v.condition) parts.push(`(${v.condition})`);
   return parts.join(' · ');
