@@ -4,10 +4,52 @@
 
 import { getAvoidTags, getIntensityModifier } from '../data/conditions.js';
 
-/**
- * Pick the number of exercises a session should contain based on time available.
- * Accounts for warm-up + rest periods at ~3.5 minutes per exercise on average.
- */
+const MIN_EXERCISES = 3;
+const MAX_EXERCISES = 12;
+
+const DEFAULT_REQUEST = {
+  goal: 'general',
+  muscle: 'full_body',
+  equipment: 'any',
+  time: null,
+  level: null,
+  condition: '',
+  exerciseCount: null,
+};
+
+const MUSCLE_PRIMARY = {
+  chest: ['chest'],
+  biceps: ['biceps'],
+  triceps: ['triceps'],
+  shoulders: ['shoulders'],
+  traps: ['traps'],
+  forearms: ['forearms'],
+  lats: ['lats', 'middle back', 'lower back'],
+  back: ['lats', 'middle back', 'lower back', 'traps'],
+  quadriceps: ['quadriceps'],
+  hamstrings: ['hamstrings'],
+  calves: ['calves'],
+  glutes: ['glutes'],
+  core: ['abdominals'],
+  abdominals: ['abdominals'],
+  legs: ['quadriceps', 'hamstrings', 'calves', 'glutes', 'adductors', 'abductors'],
+  lower: ['quadriceps', 'hamstrings', 'calves', 'glutes', 'adductors', 'abductors'],
+  upper: [
+    'chest',
+    'shoulders',
+    'triceps',
+    'biceps',
+    'lats',
+    'middle back',
+    'lower back',
+    'traps',
+    'forearms',
+  ],
+  push: ['chest', 'shoulders', 'triceps'],
+  pull: ['biceps', 'lats', 'middle back', 'lower back', 'traps', 'forearms'],
+  full_body: null,
+};
+
 function exerciseCountForTime(minutes) {
   if (!minutes || minutes < 10) return 3;
   if (minutes <= 20) return 4;
@@ -18,9 +60,12 @@ function exerciseCountForTime(minutes) {
   return 9;
 }
 
-/**
- * Sets / reps / rest schemes by goal.
- */
+function clampExerciseCount(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(MIN_EXERCISES, Math.min(MAX_EXERCISES, Math.round(n)));
+}
+
 const SCHEMES = {
   strength: { sets: 4, reps: '4-6', rest: 120 },
   hypertrophy: { sets: 4, reps: '8-12', rest: 75 },
@@ -30,9 +75,6 @@ const SCHEMES = {
   general: { sets: 3, reps: '10-12', rest: 60 },
 };
 
-/**
- * Apply an intensity modifier to a rep range string. "8-12" * 0.7 → "6-8".
- */
 function adjustReps(repsStr, modifier) {
   if (modifier >= 1) return repsStr;
   const m = repsStr.match(/^(\d+)-(\d+)$/);
@@ -42,106 +84,192 @@ function adjustReps(repsStr, modifier) {
   return `${lo}-${hi}`;
 }
 
-/**
- * Score how well an exercise matches the request. Higher = better.
- * Returns null if the exercise should be excluded entirely.
- */
-function scoreExercise(ex, req, avoidTags) {
-  // SAFETY FIRST — if the exercise has any avoided tag, exclude it.
-  if (ex.tags?.some((t) => avoidTags.has(t))) return null;
+function normalizeRequest(request = {}) {
+  const rawTime = request.time === '' || request.time === undefined ? null : request.time;
+  const parsedTime = rawTime === null ? null : Number(rawTime);
+  const safeTime = Number.isFinite(parsedTime)
+    ? Math.max(5, Math.min(180, Math.round(parsedTime)))
+    : null;
 
-  // Equipment match (hard filter unless user picked "any" / undefined)
-  if (req.equipment && req.equipment !== 'any') {
-    if (req.equipment === 'none') {
-      // User explicitly wants bodyweight — strict.
-      if (ex.equipment !== 'none') return null;
-    } else if (req.equipment === 'machines') {
-      // "Machines (gym)" includes bodyweight as fallback at lower priority.
-      if (ex.equipment !== 'machines' && ex.equipment !== 'none') return null;
-    } else if (ex.equipment !== req.equipment && ex.equipment !== 'none') {
-      return null;
+  return {
+    ...DEFAULT_REQUEST,
+    ...request,
+    time: safeTime,
+    level: request.level || null,
+    condition: request.condition || '',
+    exerciseCount: clampExerciseCount(request.exerciseCount),
+  };
+}
+
+function primaryMuscleMatches(ex, requestedMuscle) {
+  if (!requestedMuscle || requestedMuscle === 'full_body') return true;
+  const allowed = MUSCLE_PRIMARY[requestedMuscle];
+  if (!allowed) return true;
+  const primary = ex.primaryMuscles || [];
+  return primary.some((m) => allowed.includes(m));
+}
+
+function muscleTagsMatch(ex, requestedMuscle) {
+  if (!requestedMuscle || requestedMuscle === 'full_body') return true;
+  const muscles = ex.muscle || [];
+  if (muscles.includes(requestedMuscle)) return true;
+  const allowed = MUSCLE_PRIMARY[requestedMuscle] || [];
+  return muscles.some((m) => allowed.includes(m));
+}
+
+function equipmentMatches(ex, requestedEquipment) {
+  if (!requestedEquipment || requestedEquipment === 'any') return true;
+  return ex.equipment === requestedEquipment;
+}
+
+function normalizeExerciseKey(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(
+      /\b(with|the|and|or|de|con|sin|a|an|one|two|arm|single|double)\b/g,
+      '',
+    )
+    .replace(
+      /\b(barbell|dumbbell|cable|machine|smith|band|bands|bodyweight|incline|decline|flat)\b/g,
+      '',
+    )
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function exerciseKey(ex) {
+  return normalizeExerciseKey(ex.id || ex.name?.en || ex.name?.es);
+}
+
+function isDuplicateExercise(ex, chosen) {
+  const key = exerciseKey(ex);
+  const id = String(ex.id || '').toLowerCase();
+
+  if (!key && !id) return false;
+
+  return chosen.some((c) => {
+    const cKey = exerciseKey(c);
+    const cId = String(c.id || '').toLowerCase();
+
+    if (id && cId && id === cId) return true;
+    if (!key || !cKey) return false;
+    if (key === cKey) return true;
+
+    if (key.length >= 8 && cKey.length >= 8) {
+      return key.includes(cKey) || cKey.includes(key);
     }
+
+    return false;
+  });
+}
+
+function isValidExerciseForRequest(ex, req, avoidTags) {
+  if (ex.tags?.some((t) => avoidTags.has(t))) return false;
+
+  // Strict equipment filter. If user says dumbbells, machines are not invited.
+  if (!equipmentMatches(ex, req.equipment)) return false;
+
+  // Strict muscle filter. For chest, primary muscle must be chest.
+  // No more sled push in chest day. Civilization advances.
+  if (req.muscle && req.muscle !== 'full_body') {
+    if (!muscleTagsMatch(ex, req.muscle)) return false;
+    if (!primaryMuscleMatches(ex, req.muscle)) return false;
   }
+
+  // Do not sneak stretching into strength/hypertrophy routines.
+  if (req.goal !== 'mobility' && ex.category === 'stretching') return false;
+
+  return true;
+}
+
+function scoreExercise(ex, req, avoidTags) {
+  if (!isValidExerciseForRequest(ex, req, avoidTags)) return null;
 
   let score = 0;
 
-  // Muscle match (or full_body request matches anything)
   if (req.muscle && req.muscle !== 'full_body') {
-    const muscles = ex.muscle || [];
-    if (muscles.includes(req.muscle)) score += 12;
-    else if (muscles.includes('full_body')) score += 2;
-    else return null; // doesn't hit the requested muscle group at all
+    score += 20;
+    if (primaryMuscleMatches(ex, req.muscle)) score += 12;
   } else {
     score += 5;
   }
 
-  // Level match
   if (req.level) {
     const order = { beginner: 1, intermediate: 2, advanced: 3 };
     const exLvl = order[ex.level] || 2;
     const reqLvl = order[req.level] || 2;
+
     if (exLvl === reqLvl) score += 4;
     else if (exLvl < reqLvl) score += 2;
-    else score -= 3; // too advanced for the user
+    else score -= 3;
   }
 
-  // Equipment exact match bonus
-  if (ex.equipment === req.equipment) score += 3;
+  if (ex.equipment === req.equipment) score += 4;
+  if (ex.category === 'stretching' && req.goal !== 'mobility') score -= 8;
 
-  // Slight randomization so successive generations vary a bit
   score += Math.random() * 0.5;
 
   return score;
 }
 
-/**
- * Generate a routine.
- */
 export function generateRoutine(request, exercises, conditionKeys = []) {
+  const req = normalizeRequest(request);
   const avoidTags = getAvoidTags(conditionKeys);
   const intensity = getIntensityModifier(conditionKeys);
 
-  // 1) Filter to image-bearing items only (defense in depth).
-  const pool = exercises.filter((e) => Array.isArray(e.images) ? e.images.length > 0 : !!e.gif);
+  const pool = exercises.filter((e) =>
+    Array.isArray(e.images) ? e.images.length > 0 : !!e.gif,
+  );
 
-  // 2) Score & rank.
   const scored = pool
-    .map((ex) => ({ ex, score: scoreExercise(ex, request, avoidTags) }))
+    .map((ex) => ({ ex, score: scoreExercise(ex, req, avoidTags) }))
     .filter((s) => s.score !== null)
     .sort((a, b) => b.score - a.score);
 
   if (scored.length === 0) {
-    return { exercises: [], conditionKeys, intensity, empty: true, request };
+    return { exercises: [], conditionKeys, intensity, empty: true, request: req };
   }
 
-  // 3) Choose top N, but enforce muscle variety so we don't pick 5 push exercises in a row.
-  const targetCount = exerciseCountForTime(request.time);
+  const countFromTime = exerciseCountForTime(req.time || 30);
+  const desiredCount = req.exerciseCount || countFromTime;
+  const targetCount = Math.min(desiredCount, scored.length, MAX_EXERCISES);
+
   const chosen = [];
   const muscleHits = {};
+
   for (const { ex } of scored) {
+    if (chosen.length >= targetCount) break;
+    if (isDuplicateExercise(ex, chosen)) continue;
+
     const primary = (ex.primaryMuscles && ex.primaryMuscles[0]) || (ex.muscle && ex.muscle[0]);
+
     if (primary) {
       muscleHits[primary] = (muscleHits[primary] || 0) + 1;
-      // soft cap of 2 per primary muscle when the request is full_body
-      if (request.muscle === 'full_body' && muscleHits[primary] > 2) continue;
-      // soft cap of 3 per primary muscle for specific group requests (variety inside the group)
-      if (request.muscle !== 'full_body' && muscleHits[primary] > 3) continue;
+
+      // For full body, avoid 5 chest exercises pretending to be balance.
+      if (req.muscle === 'full_body' && muscleHits[primary] > 2) continue;
     }
+
     chosen.push(ex);
-    if (chosen.length >= targetCount) break;
   }
 
-  // Fall back: if variety filter starved us, refill from scored.
-  if (chosen.length < Math.min(targetCount, scored.length)) {
+  // Refill only with valid non-duplicates. Never use unrelated junk as filler.
+  if (chosen.length < targetCount) {
     for (const { ex } of scored) {
       if (chosen.length >= targetCount) break;
+      if (isDuplicateExercise(ex, chosen)) continue;
       if (!chosen.includes(ex)) chosen.push(ex);
     }
   }
 
-  // 4) Build prescriptions per goal, with intensity modifier applied to volume.
-  const scheme = SCHEMES[request.goal] || SCHEMES.general;
-  const prescribed = chosen.map((ex) => ({
+  const validated = chosen.filter((ex) => isValidExerciseForRequest(ex, req, avoidTags));
+
+  if (validated.length === 0) {
+    return { exercises: [], conditionKeys, intensity, empty: true, request: req };
+  }
+
+  const scheme = SCHEMES[req.goal] || SCHEMES.general;
+
+  const prescribed = validated.map((ex) => ({
     ...ex,
     sets: Math.max(2, Math.round(scheme.sets * (intensity < 1 ? 0.85 : 1))),
     reps: adjustReps(scheme.reps, intensity),
@@ -152,44 +280,43 @@ export function generateRoutine(request, exercises, conditionKeys = []) {
     exercises: prescribed,
     conditionKeys,
     intensity,
-    request,
+    request: req,
+    requestedCount: req.exerciseCount || null,
+    availableMatches: scored.length,
     createdAt: new Date().toISOString(),
     empty: false,
   };
 }
 
-/**
- * Parse free-text into a structured request. Deterministic keyword parser,
- * not an LLM. Handles English + Spanish phrasings users actually use.
- */
 export function parseRequestText(text) {
   const t = (text || '').toLowerCase();
-  const req = {
-    goal: 'general',
-    muscle: 'full_body',
-    equipment: 'any',
-    time: 30,
-    level: 'beginner',
-    condition: text || '',
-  };
+  const req = { ...DEFAULT_REQUEST, condition: text || '' };
 
-  // ---------- GOAL ----------
+  const countMatch = t.match(
+    /(?:dame|quiero|hazme|genera|generate|give me|build me|make me)?\s*(\d{1,2})\s*(?:ejercicios?|exercises?|movimientos?|moves?)\b/,
+  );
+
+  if (countMatch) {
+    req.exerciseCount = clampExerciseCount(countMatch[1]);
+  }
+
   if (/\b(strength|fuerza)\b/.test(t)) req.goal = 'strength';
-  else if (/\b(hypertrophy|muscle|hipertrofia|m[uú]sculo|masa)\b/.test(t)) req.goal = 'hypertrophy';
-  else if (/\b(endurance|cardio|resistencia|aer[oó]bico)\b/.test(t)) req.goal = 'endurance';
-  else if (/\b(fat ?loss|weight ?loss|adelgaza|grasa|perder peso|definici[oó]n|quemar)\b/.test(t))
+  else if (/\b(hypertrophy|muscle|hipertrofia|m[uú]sculo|masa|crecer|volumen)\b/.test(t)) {
+    req.goal = 'hypertrophy';
+  } else if (/\b(endurance|cardio|resistencia|aer[oó]bico)\b/.test(t)) {
+    req.goal = 'endurance';
+  } else if (
+    /\b(fat ?loss|weight ?loss|adelgaza|grasa|perder peso|definici[oó]n|quemar)\b/.test(t)
+  ) {
     req.goal = 'fatloss';
-  else if (/\b(mobility|stretch|movilidad|estirar|flexibilidad|elasticidad)\b/.test(t))
+  } else if (/\b(mobility|stretch|movilidad|estirar|flexibilidad|elasticidad)\b/.test(t)) {
     req.goal = 'mobility';
+  }
 
-  // ---------- MUSCLE GROUP ----------
-  // Order matters: most specific first. We map to the muscle TAG used in the
-  // generator (which exerciseService attaches to each exercise via muscleToTags).
   const m = (re, val) => {
     if (re.test(t) && req.muscle === 'full_body') req.muscle = val;
   };
 
-  // Specific muscles
   m(/\b(trapecio|trapezius|traps?|trapecios)\b/, 'traps');
   m(/\b(b[ií]ceps|biceps|bicep)\b/, 'biceps');
   m(/\b(tr[ií]ceps|triceps)\b/, 'triceps');
@@ -201,7 +328,6 @@ export function parseRequestText(text) {
   m(/\b(pantorrillas?|gemelos?|calves?|s[oó]leo)\b/, 'calves');
   m(/\b(antebrazos?|forearms?)\b/, 'forearms');
 
-  // Group-level (only if no specific match yet)
   m(/\b(tren superior|upper body|parte superior|torso superior)\b/, 'upper');
   m(/\b(tren inferior|lower body|parte inferior|piernas y gl[uú]teos)\b/, 'lower');
   m(/\b(core|abdomen|abs|abdominales?|abdominal)\b/, 'core');
@@ -211,46 +337,135 @@ export function parseRequestText(text) {
   m(/\b(gl[uú]teos?|glutes?|nalgas?|cola|booty)\b/, 'glutes');
   m(/\b(full[- ]?body|cuerpo completo|todo el cuerpo|cuerpo entero)\b/, 'full_body');
 
-  // ---------- EQUIPMENT ----------
-  if (/\b(no equipment|sin equipo|sin material|bodyweight|peso corporal|en casa|at home|sin pesas|sin m[aá]quinas?|sin gym|sin gimnasio)\b/.test(t))
+  if (
+    /\b(no equipment|sin equipo|sin material|bodyweight|peso corporal|sin pesas|sin m[aá]quinas?|sin gym|sin gimnasio)\b/.test(
+      t,
+    )
+  ) {
     req.equipment = 'none';
-  else if (/\b(dumbbell|mancuernas?|pesas? de mano)\b/.test(t)) req.equipment = 'dumbbells';
-  else if (/\b(barbell|barra ol[ií]mpica|con barra)\b/.test(t)) req.equipment = 'barbell';
-  else if (/\b(bands?|bandas?|elasticos?|el[aá]sticas?|tubular)\b/.test(t)) req.equipment = 'bands';
-  else if (/\b(kettlebell|pesa rusa|kettle)\b/.test(t)) req.equipment = 'kettlebell';
-  else if (/\b(machines?|m[aá]quinas?|gym|gimnasio|polea|cable|cables)\b/.test(t))
+  } else if (/\b(dumbbell|dumbbells|mancuernas?|pesas? de mano)\b/.test(t)) {
+    req.equipment = 'dumbbells';
+  } else if (/\b(barbell|barra ol[ií]mpica|con barra)\b/.test(t)) {
+    req.equipment = 'barbell';
+  } else if (/\b(bands?|bandas?|elasticos?|el[aá]sticas?|tubular)\b/.test(t)) {
+    req.equipment = 'bands';
+  } else if (/\b(kettlebell|pesa rusa|kettle)\b/.test(t)) {
+    req.equipment = 'kettlebell';
+  } else if (/\b(machines?|m[aá]quinas?|gym|gimnasio|polea|cable|cables)\b/.test(t)) {
     req.equipment = 'machines';
+  } else if (/\b(en casa|at home|home workout|casa)\b/.test(t)) {
+    req.equipment = 'none';
+  }
 
-  // ---------- TIME ----------
-  // Match "60 minutos", "1 hora", "1.5 horas", "an hour", etc.
   const minMatch = t.match(/(\d{1,3})\s*(min|minute|minuto)/);
+
   if (minMatch) {
     req.time = parseInt(minMatch[1], 10);
   } else {
     const hourMatch = t.match(/(\d+(?:\.\d+)?)\s*(hour|hora|hr)/);
-    if (hourMatch) req.time = Math.round(parseFloat(hourMatch[1]) * 60);
-    else if (/\b(quick|r[aá]pid|short|corto|breve)\b/.test(t)) req.time = 15;
-    else if (/\b(long|largo|extenso|completo)\b/.test(t)) req.time = 60;
-  }
-  // Clamp absurd values
-  if (req.time < 5) req.time = 5;
-  if (req.time > 180) req.time = 180;
 
-  // ---------- LEVEL ----------
-  if (/\b(beginner|principiante|nuevo|novato|empezando)\b/.test(t)) req.level = 'beginner';
-  else if (/\b(intermediate|intermedio|medio)\b/.test(t)) req.level = 'intermediate';
-  else if (/\b(advanced|avanzado|experto|atleta)\b/.test(t)) req.level = 'advanced';
+    if (hourMatch) {
+      req.time = Math.round(parseFloat(hourMatch[1]) * 60);
+    } else if (/\b(quick|r[aá]pid|short|corto|breve)\b/.test(t)) {
+      req.time = 15;
+    } else if (/\b(long|largo|extenso|completo)\b/.test(t)) {
+      req.time = 60;
+    }
+  }
+
+  if (req.time !== null) {
+    if (req.time < 5) req.time = 5;
+    if (req.time > 180) req.time = 180;
+  }
+
+  if (/\b(beginner|principiante|nuevo|novato|empezando)\b/.test(t)) {
+    req.level = 'beginner';
+  } else if (/\b(intermediate|intermedio|medio)\b/.test(t)) {
+    req.level = 'intermediate';
+  } else if (/\b(advanced|avanzado|experto|atleta)\b/.test(t)) {
+    req.level = 'advanced';
+  }
 
   return req;
 }
 
-/**
- * Build a YouTube search URL for a given exercise. We use a search URL
- * (rather than a specific video ID) because:
- *  - We can't verify any specific video stays online
- *  - YouTube's search always returns fresh, popular tutorials
- *  - The user can pick which one looks right
- */
+export function getMissingRequestFields(req = {}) {
+  const missing = [];
+
+  if (!req.goal || req.goal === 'general') missing.push('goal');
+  if (!req.time && !req.exerciseCount) missing.push('time');
+  if (!req.equipment || req.equipment === 'any') missing.push('equipment');
+  if (!req.level) missing.push('level');
+
+  return missing;
+}
+
+export function buildClarifyingQuestion(req = {}, lang = 'en') {
+  const missing = getMissingRequestFields(req);
+
+  if (missing.length === 0) return null;
+
+  if (lang === 'es') {
+    const parts = [];
+
+    if (missing.includes('goal')) {
+      parts.push('objetivo: fuerza, hipertrofia, resistencia, grasa o movilidad');
+    }
+
+    if (missing.includes('time')) {
+      parts.push('tiempo disponible o número de ejercicios');
+    }
+
+    if (missing.includes('equipment')) {
+      parts.push('equipo disponible');
+    }
+
+    if (missing.includes('level')) {
+      parts.push('nivel: principiante, intermedio o avanzado');
+    }
+
+    return `Para armarla bien necesito: ${parts.join(
+      '; ',
+    )}. También dime si tienes lesión o condición médica. Ejemplo: “hipertrofia, 45 min, mancuernas, intermedio, sin lesiones”.`;
+  }
+
+  const parts = [];
+
+  if (missing.includes('goal')) {
+    parts.push('goal: strength, hypertrophy, endurance, fat loss, or mobility');
+  }
+
+  if (missing.includes('time')) {
+    parts.push('time available or number of exercises');
+  }
+
+  if (missing.includes('equipment')) {
+    parts.push('available equipment');
+  }
+
+  if (missing.includes('level')) {
+    parts.push('level: beginner, intermediate, or advanced');
+  }
+
+  return `To build it properly I need: ${parts.join(
+    '; ',
+  )}. Also mention any injury or medical condition. Example: “hypertrophy, 45 min, dumbbells, intermediate, no injuries”.`;
+}
+
+export function mergeRequestDraft(previous = {}, next = {}) {
+  return {
+    ...DEFAULT_REQUEST,
+    ...previous,
+    goal: next.goal && next.goal !== 'general' ? next.goal : previous.goal || 'general',
+    muscle: next.muscle && next.muscle !== 'full_body' ? next.muscle : previous.muscle || 'full_body',
+    equipment: next.equipment && next.equipment !== 'any' ? next.equipment : previous.equipment || 'any',
+    time: next.time ?? previous.time ?? null,
+    level: next.level ?? previous.level ?? null,
+    exerciseCount: next.exerciseCount ?? previous.exerciseCount ?? null,
+    condition: [previous.condition, next.condition].filter(Boolean).join(' '),
+  };
+}
+
 export function youtubeSearchUrl(exerciseName, lang = 'en') {
   const prefix = lang === 'es' ? 'cómo hacer ' : 'how to do ';
   const q = encodeURIComponent(`${prefix}${exerciseName}`);
