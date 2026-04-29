@@ -110,10 +110,12 @@ export function exportRoutinePdf(routine, lang = 'en', routineName) {
     const meta = `${ex.sets} ${t.common.sets}  ·  ${ex.reps} ${t.common.reps}  ·  ${ex.rest}${t.common.seconds} ${t.common.rest}`;
     doc.text(meta, margin + 14, y + 42);
 
-    if (ex.instructions?.[lang]?.[0]) {
+    const firstInstr =
+      ex.instructions?.[lang]?.[0] || ex.instructions?.en?.[0] || null;
+    if (firstInstr) {
       doc.setFontSize(9);
       doc.setTextColor(120, 120, 120);
-      const firstStep = doc.splitTextToSize(ex.instructions[lang][0], pageW - margin * 2 - 28);
+      const firstStep = doc.splitTextToSize(firstInstr, pageW - margin * 2 - 28);
       doc.text(firstStep, margin + 14, y + 60);
     }
 
