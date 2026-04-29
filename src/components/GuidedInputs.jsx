@@ -1,62 +1,53 @@
 import { useState } from 'react';
 import { useLanguage } from '../hooks/useLanguage.jsx';
 
-const FIELDS = [
-  {
-    key: 'goal',
-    options: ['strength', 'hypertrophy', 'endurance', 'fatloss', 'mobility', 'general'],
-    labelKey: 'goal',
-    valueMap: 'goals',
-  },
-  {
-    key: 'muscle',
-    // Expanded taxonomy: groups + specific muscles. The generator handles them all.
-    options: [
-      'full_body',
-      'upper',
-      'lower',
-      'push',
-      'pull',
-      'core',
-      'chest',
-      'back',
-      'shoulders',
-      'biceps',
-      'triceps',
-      'traps',
-      'forearms',
-      'quadriceps',
-      'hamstrings',
-      'glutes',
-      'calves',
-    ],
-    labelKey: 'muscle',
-    valueMap: 'muscles',
-  },
-  {
-    key: 'equipment',
-    options: ['any', 'none', 'dumbbells', 'barbell', 'bands', 'kettlebell', 'machines'],
-    labelKey: 'equipment',
-    valueMap: 'equipments',
-  },
-  {
-    key: 'level',
-    options: ['beginner', 'intermediate', 'advanced'],
-    labelKey: 'level',
-    valueMap: 'levels',
-  },
+const GOALS = ['strength', 'hypertrophy', 'endurance', 'fatloss', 'mobility', 'general'];
+
+const MUSCLES = [
+  'full_body',
+  'upper',
+  'lower',
+  'push',
+  'pull',
+  'core',
+  'chest',
+  'back',
+  'shoulders',
+  'biceps',
+  'triceps',
+  'traps',
+  'forearms',
+  'quadriceps',
+  'hamstrings',
+  'glutes',
+  'calves',
 ];
 
+const EQUIPMENT = [
+  'none',
+  'dumbbells',
+  'barbell',
+  'bands',
+  'kettlebell',
+  'machines',
+  'exercise_ball',
+  'medicine_ball',
+];
+
+const LEVELS = ['beginner', 'intermediate', 'advanced'];
 const TIMES = [15, 30, 45, 60, 90, 120];
+const COUNTS = [4, 6, 8, 10, 12];
 
 export function GuidedInputs({ initial, onSubmit, onCancel }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+
   const [values, setValues] = useState(() => ({
     goal: 'general',
-    muscle: 'full_body',
-    equipment: 'any',
+    muscles: ['full_body'],
+    equipment: ['none'],
     level: 'beginner',
     time: 30,
+    exerciseCount: null,
     condition: '',
     ...initial,
   }));
@@ -65,45 +56,119 @@ export function GuidedInputs({ initial, onSubmit, onCancel }) {
     setValues((prev) => ({ ...prev, [k]: v }));
   }
 
+  function toggleArray(key, value) {
+    setValues((prev) => {
+      const current = Array.isArray(prev[key]) ? prev[key] : [];
+
+      if (value === 'full_body') {
+        return { ...prev, [key]: ['full_body'] };
+      }
+
+      const withoutFull = current.filter((x) => x !== 'full_body');
+      const exists = withoutFull.includes(value);
+      const next = exists ? withoutFull.filter((x) => x !== value) : [...withoutFull, value];
+
+      return {
+        ...prev,
+        [key]: next.length ? next : key === 'muscles' ? ['full_body'] : [],
+      };
+    });
+  }
+
+  function submit() {
+    onSubmit({
+      ...values,
+      muscle: values.muscles?.[0] || 'full_body',
+      conditionStatus: values.condition ? 'described' : 'none',
+    });
+  }
+
   return (
     <div className="card space-y-5 p-5">
-      {FIELDS.map((field) => (
-        <div key={field.key}>
-          <div className="label">{t.form[field.labelKey]}</div>
-          <div className="flex flex-wrap gap-1.5">
-            {field.options.map((opt) => {
-              const label = t.form[field.valueMap]?.[opt] || opt;
-              return (
-                <button
-                  key={opt}
-                  onClick={() => set(field.key, opt)}
-                  className={`chip ${values[field.key] === opt ? 'chip-active' : ''}`}
-                  type="button"
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+      <ChipGroup
+        label={t.form.goal}
+        options={GOALS}
+        selected={values.goal}
+        labels={t.form.goals}
+        single
+        onSelect={(v) => set('goal', v)}
+      />
+
+      <ChipGroup
+        label={
+          lang === 'es'
+            ? 'Grupos musculares'
+            : 'Muscle groups'
+        }
+        options={MUSCLES}
+        selected={values.muscles}
+        labels={t.form.muscles}
+        onSelect={(v) => toggleArray('muscles', v)}
+      />
+
+      <ChipGroup
+        label={
+          lang === 'es'
+            ? 'Equipo disponible'
+            : 'Available equipment'
+        }
+        options={EQUIPMENT}
+        selected={values.equipment}
+        labels={{
+          ...t.form.equipments,
+          none: lang === 'es' ? 'Peso corporal' : 'Bodyweight',
+        }}
+        onSelect={(v) => toggleArray('equipment', v)}
+      />
+
+      <ChipGroup
+        label={t.form.level}
+        options={LEVELS}
+        selected={values.level}
+        labels={t.form.levels}
+        single
+        onSelect={(v) => set('level', v)}
+      />
 
       <div>
         <div className="label">
-          {t.form.time}{' '}
-          <span className="ml-1 text-neutral-500">
-            ({values.time} {t.common.minutes})
-          </span>
+          {lang === 'es' ? 'Tiempo disponible' : 'Time available'}
+          {values.time && !values.exerciseCount && (
+            <span className="ml-1 text-neutral-500">
+              ({values.time} {t.common.minutes})
+            </span>
+          )}
         </div>
+
         <div className="flex flex-wrap gap-1.5">
           {TIMES.map((m) => (
             <button
               key={m}
               type="button"
-              onClick={() => set('time', m)}
-              className={`chip flex-1 justify-center ${values.time === m ? 'chip-active' : ''}`}
+              onClick={() => setValues((prev) => ({ ...prev, time: m, exerciseCount: null }))}
+              className={`chip flex-1 justify-center ${values.time === m && !values.exerciseCount ? 'chip-active' : ''}`}
             >
               {m}m
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div className="label">
+          {lang === 'es' ? 'Número de ejercicios' : 'Number of exercises'}
+          {values.exerciseCount && <span className="ml-1 text-neutral-500">({values.exerciseCount})</span>}
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          {COUNTS.map((n) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => setValues((prev) => ({ ...prev, exerciseCount: n, time: null }))}
+              className={`chip flex-1 justify-center ${values.exerciseCount === n ? 'chip-active' : ''}`}
+            >
+              {n}
             </button>
           ))}
         </div>
@@ -116,6 +181,7 @@ export function GuidedInputs({ initial, onSubmit, onCancel }) {
             ({t.common.optional})
           </span>
         </div>
+
         <input
           className="input"
           value={values.condition}
@@ -130,9 +196,37 @@ export function GuidedInputs({ initial, onSubmit, onCancel }) {
             {t.common.cancel}
           </button>
         )}
-        <button type="button" onClick={() => onSubmit(values)} className="btn-primary flex-1">
+
+        <button type="button" onClick={submit} className="btn-primary flex-1">
           {t.chat.generate} →
         </button>
+      </div>
+    </div>
+  );
+}
+
+function ChipGroup({ label, options, selected, labels, onSelect, single = false }) {
+  const selectedArray = Array.isArray(selected) ? selected : [selected];
+
+  return (
+    <div>
+      <div className="label">{label}</div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((opt) => {
+          const active = single ? selected === opt : selectedArray.includes(opt);
+
+          return (
+            <button
+              key={opt}
+              onClick={() => onSelect(opt)}
+              className={`chip ${active ? 'chip-active' : ''}`}
+              type="button"
+            >
+              {labels?.[opt] || opt}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
