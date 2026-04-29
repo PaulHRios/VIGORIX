@@ -10,13 +10,32 @@ const FIELDS = [
   },
   {
     key: 'muscle',
-    options: ['full_body', 'upper', 'lower', 'core', 'push', 'pull', 'legs', 'glutes'],
+    // Expanded taxonomy: groups + specific muscles. The generator handles them all.
+    options: [
+      'full_body',
+      'upper',
+      'lower',
+      'push',
+      'pull',
+      'core',
+      'chest',
+      'back',
+      'shoulders',
+      'biceps',
+      'triceps',
+      'traps',
+      'forearms',
+      'quadriceps',
+      'hamstrings',
+      'glutes',
+      'calves',
+    ],
     labelKey: 'muscle',
     valueMap: 'muscles',
   },
   {
     key: 'equipment',
-    options: ['none', 'dumbbells', 'barbell', 'bands', 'kettlebell', 'machines'],
+    options: ['any', 'none', 'dumbbells', 'barbell', 'bands', 'kettlebell', 'machines'],
     labelKey: 'equipment',
     valueMap: 'equipments',
   },
@@ -28,14 +47,14 @@ const FIELDS = [
   },
 ];
 
-const TIMES = [15, 30, 45, 60];
+const TIMES = [15, 30, 45, 60, 90, 120];
 
 export function GuidedInputs({ initial, onSubmit, onCancel }) {
   const { t } = useLanguage();
   const [values, setValues] = useState(() => ({
     goal: 'general',
     muscle: 'full_body',
-    equipment: 'none',
+    equipment: 'any',
     level: 'beginner',
     time: 30,
     condition: '',
@@ -52,25 +71,31 @@ export function GuidedInputs({ initial, onSubmit, onCancel }) {
         <div key={field.key}>
           <div className="label">{t.form[field.labelKey]}</div>
           <div className="flex flex-wrap gap-1.5">
-            {field.options.map((opt) => (
-              <button
-                key={opt}
-                onClick={() => set(field.key, opt)}
-                className={`chip ${values[field.key] === opt ? 'chip-active' : ''}`}
-                type="button"
-              >
-                {t.form[field.valueMap][opt]}
-              </button>
-            ))}
+            {field.options.map((opt) => {
+              const label = t.form[field.valueMap]?.[opt] || opt;
+              return (
+                <button
+                  key={opt}
+                  onClick={() => set(field.key, opt)}
+                  className={`chip ${values[field.key] === opt ? 'chip-active' : ''}`}
+                  type="button"
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
         </div>
       ))}
 
       <div>
         <div className="label">
-          {t.form.time} <span className="ml-1 text-neutral-500">({values.time} {t.common.minutes})</span>
+          {t.form.time}{' '}
+          <span className="ml-1 text-neutral-500">
+            ({values.time} {t.common.minutes})
+          </span>
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {TIMES.map((m) => (
             <button
               key={m}
