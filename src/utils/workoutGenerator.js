@@ -5,8 +5,9 @@ const MAX_EXERCISES = 12;
 
 const DEFAULT_REQUEST = {
   goal: 'general',
-  muscles: ['full_body'],
-  muscle: 'full_body',
+  muscles: [],
+  muscle: null,
+  muscleStatus: null,
   equipment: ['any'],
   time: null,
   level: null,
@@ -34,7 +35,7 @@ const MUSCLE_PRIMARY = {
   lower: ['quadriceps', 'hamstrings', 'calves', 'glutes', 'adductors', 'abductors'],
   upper: ['chest', 'shoulders', 'triceps', 'biceps', 'lats', 'middle back', 'lower back', 'traps'],
   push: ['chest', 'shoulders', 'triceps'],
-  pull: ['biceps', 'lats', 'middle back', 'lower back', 'traps', 'forearms'],
+  pull: ['lats', 'middle back', 'lower back', 'traps', 'biceps', 'forearms'],
   full_body: null,
 };
 
@@ -160,7 +161,7 @@ function unique(arr) {
 }
 
 function normalizeMuscles(input) {
-  const raw = Array.isArray(input) ? input : input ? [input] : ['full_body'];
+  const raw = Array.isArray(input) ? input : input ? [input] : [];
   const cleaned = raw.filter(Boolean);
 
   if (cleaned.length === 0) return ['full_body'];
@@ -200,6 +201,11 @@ export function normalizeRequest(request = {}) {
     ? Math.max(5, Math.min(180, Math.round(parsedTime)))
     : null;
 
+  const hasExplicitMuscleIntent =
+    request.muscleStatus === 'selected' ||
+    (Array.isArray(request.muscles) && request.muscles.length > 0) ||
+    (request.muscle && request.muscle !== 'full_body');
+
   const muscles = normalizeMuscles(request.muscles || request.muscle);
   const equipment = normalizeEquipment(request.equipment);
 
@@ -208,6 +214,7 @@ export function normalizeRequest(request = {}) {
     ...request,
     muscles,
     muscle: muscles[0] || 'full_body',
+    muscleStatus: hasExplicitMuscleIntent ? 'selected' : request.muscleStatus || null,
     equipment,
     time: safeTime,
     level: request.level || null,
@@ -219,9 +226,7 @@ export function normalizeRequest(request = {}) {
 
 function equipmentMatches(ex, requestedEquipment) {
   const eq = normalizeEquipment(requestedEquipment);
-
   if (eq.includes('any')) return true;
-
   return eq.includes(ex.equipment);
 }
 
@@ -237,17 +242,8 @@ function primaryMuscleMatches(ex, requestedMuscle) {
   return primary.some((m) => allowed.includes(m));
 }
 
-function muscleTagsMatch(ex, requestedMuscle) {
-  if (!requestedMuscle || requestedMuscle === 'full_body') return true;
-
-  const muscles = ex.muscle || [];
-  const allowed = MUSCLE_PRIMARY[requestedMuscle] || [];
-
-  return muscles.includes(requestedMuscle) || muscles.some((m) => allowed.includes(m));
-}
-
 function matchesAnyRequestedMuscle(ex, req) {
-  return req.muscles.some((m) => muscleTagsMatch(ex, m) && primaryMuscleMatches(ex, m));
+  return req.muscles.some((m) => primaryMuscleMatches(ex, m));
 }
 
 function normalizeExerciseKey(value) {
@@ -287,7 +283,6 @@ function isValidExerciseForRequest(ex, req, avoidTags, targetMuscle = null) {
   if (!equipmentMatches(ex, req.equipment)) return false;
 
   if (targetMuscle) {
-    if (!muscleTagsMatch(ex, targetMuscle)) return false;
     if (!primaryMuscleMatches(ex, targetMuscle)) return false;
   } else if (!matchesAnyRequestedMuscle(ex, req)) {
     return false;
@@ -342,8 +337,8 @@ function scoreExercise(ex, req, avoidTags, targetMuscle = null, preferredSection
   let score = 0;
 
   if (targetMuscle) {
-    score += 25;
-    if (primaryMuscleMatches(ex, targetMuscle)) score += 15;
+    score += 30;
+    if (primaryMuscleMatches(ex, targetMuscle)) score += 20;
   }
 
   if (req.level) {
@@ -499,17 +494,6 @@ export function generateRoutine(request, exercises, conditionKeys = []) {
     }
   }
 
-  if (chosen.length < Math.min(targetCount, baseScored.length)) {
-    for (const { ex } of baseScored) {
-      if (chosen.length >= targetCount) break;
-      if (isDuplicateExercise(ex, chosen)) continue;
-
-      const targetMuscle = req.muscles.find((m) => primaryMuscleMatches(ex, m)) || req.muscles[0];
-
-      chosen.push(buildPrescription(ex, req, intensity, targetMuscle));
-    }
-  }
-
   if (chosen.length === 0) {
     return { exercises: [], conditionKeys, intensity, empty: true, request: req };
   }
@@ -532,7 +516,7 @@ function addIfMatch(list, t, re, value) {
 
 function hasNegatedEquipment(t, keywordPattern) {
   const re = new RegExp(
-    `(?:no tengo|no hay|sin|excepto|menos|lo unico que no tengo|lo único que no tengo)[^.!?,;]{0,45}${keywordPattern}`,
+    `(?:no tengo|no hay|sin|excepto|menos|salvo|máquinas no|maquinas no|no máquinas|no maquinas|todo excepto|todas menos|todos menos|lo unico que no tengo|lo único que no tengo)[^.!?,;]{0,60}${keywordPattern}`,
     'i',
   );
 
@@ -551,11 +535,20 @@ function addEquipmentIfMentioned(list, t, keywordPattern, value) {
 function parseEquipmentFromText(t) {
   const equipment = [];
 
+  const saysAllExceptMachines =
+    /\b(todo|todos|todas|tengo todo|tengo todos|tengo todas)\b/.test(t) &&
+    /\b(excepto|menos|salvo)\b/.test(t) &&
+    /\b(machines?|m[aá]quinas?|maquinas?|gym|gimnasio|polea|cable|cables)\b/.test(t);
+
   const saysOnlyMissingMachines =
     /\blo [uú]nico que no tengo\b/.test(t) &&
     /\b(machines?|m[aá]quinas?|maquinas?|gym|gimnasio|polea|cable|cables)\b/.test(t);
 
-  if (saysOnlyMissingMachines) {
+  const saysMachinesNo =
+    /\b(m[aá]quinas?|maquinas?|machines?|gym|gimnasio|polea|cable|cables)\s+no\b/.test(t) ||
+    /\bno\s+(m[aá]quinas?|maquinas?|machines?|gym|gimnasio|polea|cable|cables)\b/.test(t);
+
+  if (saysAllExceptMachines || saysOnlyMissingMachines || saysMachinesNo) {
     return ALL_REAL_EQUIPMENT.filter((item) => item !== 'machines');
   }
 
@@ -621,7 +614,7 @@ function parseEquipmentFromText(t) {
 
 function parseConditionStatusFromText(t) {
   if (
-    /\b(sin lesiones|sin lesi[oó]n|sin dolor|no injuries|no injury|no pain|no medical condition|sin condici[oó]n médica|ninguna lesi[oó]n|ning[uú]n dolor)\b/.test(
+    /\b(sin lesiones|sin lesi[oó]n|sin dolor|no injuries|no injury|no pain|no medical condition|sin condici[oó]n médica|ninguna lesi[oó]n|ning[uú]n dolor|ninguna|nada|no)\b/.test(
       t,
     )
   ) {
@@ -716,8 +709,9 @@ export function parseRequestText(text) {
     req.conditionStatus = conditionStatus;
   }
 
-  req.muscles = muscles.length ? unique(muscles) : ['full_body'];
-  req.muscle = req.muscles[0];
+  req.muscles = muscles.length ? unique(muscles) : [];
+  req.muscle = req.muscles[0] || null;
+  req.muscleStatus = muscles.length ? 'selected' : null;
   req.equipment = equipment.length ? unique(equipment) : ['any'];
 
   return req;
@@ -727,7 +721,7 @@ export function mergeRequestDraft(previous = {}, next = {}) {
   const prev = normalizeRequest(previous);
   const parsedNext = normalizeRequest(next);
 
-  const nextHasSpecificMuscles = !(parsedNext.muscles.length === 1 && parsedNext.muscles[0] === 'full_body');
+  const nextHasSpecificMuscles = parsedNext.muscleStatus === 'selected';
   const nextHasSpecificEquipment = !parsedNext.equipment.includes('any');
 
   return normalizeRequest({
@@ -735,6 +729,7 @@ export function mergeRequestDraft(previous = {}, next = {}) {
     goal: parsedNext.goal && parsedNext.goal !== 'general' ? parsedNext.goal : prev.goal,
     muscles: nextHasSpecificMuscles ? parsedNext.muscles : prev.muscles,
     muscle: nextHasSpecificMuscles ? parsedNext.muscles[0] : prev.muscle,
+    muscleStatus: nextHasSpecificMuscles ? 'selected' : prev.muscleStatus,
     equipment: nextHasSpecificEquipment ? parsedNext.equipment : prev.equipment,
     time: parsedNext.time ?? prev.time,
     level: parsedNext.level ?? prev.level,
@@ -767,6 +762,7 @@ export function applyAnswerToClarifyingField(previous, parsed, field, rawText = 
 export function getNextClarifyingField(request = {}) {
   const req = normalizeRequest(request);
 
+  if (!req.muscleStatus) return 'muscles';
   if (!req.time && !req.exerciseCount) return 'time';
   if (!req.level) return 'level';
   if (!req.goal || req.goal === 'general') return 'goal';
@@ -781,18 +777,20 @@ export function buildClarifyingQuestion(request = {}, lang = 'en', field = null)
 
   const questions = {
     es: {
-      time: '¿Cuántos ejercicios quieres o cuánto tiempo tienes disponible? Ejemplo: “8 ejercicios” o “45 minutos”.',
-      level: '¿Qué nivel de intensidad buscas? Principiante, intermedio o avanzado.',
-      goal: '¿Cuál es tu objetivo principal? Fuerza, hipertrofia, resistencia, pérdida de grasa o movilidad.',
-      equipment: '¿Qué equipo tienes disponible? Puedes decir varios: peso corporal, mancuernas, barra, bandas, pelota o máquinas.',
-      condition: '¿Tienes alguna lesión o condición médica que deba tomar en cuenta? Si no, responde “sin lesiones”.',
+      muscles: '¿Qué grupo muscular quieres trabajar? Puedes elegir uno o varios.',
+      time: '¿Cuántos ejercicios quieres o cuánto tiempo tienes disponible?',
+      level: '¿Qué nivel de intensidad buscas?',
+      goal: '¿Cuál es tu objetivo principal?',
+      equipment: '¿Qué equipo tienes disponible? Selecciona uno o varios.',
+      condition: '¿Tienes alguna lesión o condición médica que deba tomar en cuenta?',
     },
     en: {
-      time: 'How many exercises do you want or how much time do you have? Example: “8 exercises” or “45 minutes”.',
-      level: 'What intensity level are you looking for? Beginner, intermediate, or advanced.',
-      goal: 'What is your main goal? Strength, hypertrophy, endurance, fat loss, or mobility.',
-      equipment: 'What equipment do you have available? You can list several: bodyweight, dumbbells, barbell, bands, exercise ball, or machines.',
-      condition: 'Do you have any injury or medical condition I should consider? If not, answer “no injuries”.',
+      muscles: 'What muscle group do you want to train? You can choose one or several.',
+      time: 'How many exercises do you want or how much time do you have?',
+      level: 'What intensity level are you looking for?',
+      goal: 'What is your main goal?',
+      equipment: 'What equipment do you have available? Select one or several.',
+      condition: 'Do you have any injury or medical condition I should consider?',
     },
   };
 
