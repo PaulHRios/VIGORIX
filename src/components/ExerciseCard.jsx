@@ -1,38 +1,101 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLanguage } from '../hooks/useLanguage.jsx';
 import { RestTimer } from './RestTimer.jsx';
 import { addLog } from '../services/storageService.js';
 import { youtubeSearchUrl } from '../utils/workoutGenerator.js';
 
-// Map equipment key to a localized human label.
-function equipmentLabel(equipment, t) {
+function equipmentLabel(equipment, t, lang) {
   const key = equipment || 'none';
-  return t.form?.equipments?.[key] || (key === 'none' ? '—' : key);
+
+  if (key === 'none') return lang === 'es' ? 'Peso corporal' : 'Bodyweight';
+
+  return t.form?.equipments?.[key] || key;
 }
 
-export function ExerciseCard({ exercise, index }) {
+function translateStepToSpanish(step) {
+  if (!step) return step;
+
+  let s = step;
+
+  const replacements = [
+    [/Lie down/gi, 'Acuéstate'],
+    [/Lie on your back/gi, 'Acuéstate boca arriba'],
+    [/Lie face down/gi, 'Acuéstate boca abajo'],
+    [/Stand straight/gi, 'Párate derecho'],
+    [/Stand tall/gi, 'Párate erguido'],
+    [/Keep your back straight/gi, 'Mantén la espalda recta'],
+    [/Keep your core braced/gi, 'Mantén el core firme'],
+    [/Keep your core tight/gi, 'Mantén el abdomen firme'],
+    [/Keep your chest up/gi, 'Mantén el pecho arriba'],
+    [/Lower the weight/gi, 'Baja el peso'],
+    [/Press the weight/gi, 'Empuja el peso'],
+    [/Return to the starting position/gi, 'Regresa a la posición inicial'],
+    [/Repeat for the recommended amount of repetitions/gi, 'Repite por el número recomendado de repeticiones'],
+    [/Hold/gi, 'Mantén'],
+    [/Slowly/gi, 'Lentamente'],
+    [/Pause/gi, 'Haz una pausa'],
+    [/Squeeze/gi, 'Aprieta'],
+    [/your chest/gi, 'tu pecho'],
+    [/your shoulders/gi, 'tus hombros'],
+    [/your back/gi, 'tu espalda'],
+    [/your knees/gi, 'tus rodillas'],
+    [/your hips/gi, 'tu cadera'],
+    [/your elbows/gi, 'tus codos'],
+    [/the floor/gi, 'el suelo'],
+    [/dumbbells/gi, 'mancuernas'],
+    [/dumbbell/gi, 'mancuerna'],
+    [/barbell/gi, 'barra'],
+    [/cable/gi, 'cable'],
+    [/machine/gi, 'máquina'],
+    [/bench/gi, 'banco'],
+  ];
+
+  for (const [pattern, replacement] of replacements) {
+    s = s.replace(pattern, replacement);
+  }
+
+  return s;
+}
+
+export function ExerciseCard({ exercise, index, onReplace, replacing = false }) {
   const { t, lang } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const [showLog, setShowLog] = useState(false);
 
   const name = exercise.name?.[lang] || exercise.name?.en || exercise.id;
-  const steps = exercise.instructions?.[lang]?.length
-    ? exercise.instructions[lang]
-    : exercise.instructions?.en || [];
+
+  const steps = useMemo(() => {
+    const raw =
+      exercise.instructions?.[lang]?.length
+        ? exercise.instructions[lang]
+        : exercise.instructions?.en || [];
+
+    if (lang !== 'es') return raw;
+
+    return raw.map(translateStepToSpanish);
+  }, [exercise, lang]);
 
   const ytUrl = youtubeSearchUrl(exercise.youtubeQuery || exercise.name?.en || name, lang);
+  const sectionLabel = exercise.muscleSection?.label?.[lang] || exercise.muscleSection?.label?.en;
 
   return (
     <article className="card animate-slide-up overflow-hidden">
       <ExerciseImage exercise={exercise} alt={name} />
 
-      <div className="absolute pointer-events-none" />
-
       <div className="space-y-3 p-4">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="heading-display flex-1 text-lg leading-tight">{name}</h3>
+          <div className="min-w-0 flex-1">
+            <h3 className="heading-display text-lg leading-tight">{name}</h3>
+
+            {sectionLabel && (
+              <div className="mt-1 rounded-full bg-white/[0.04] px-2 py-1 font-display text-[10px] uppercase tracking-wider text-neon-300">
+                {lang === 'es' ? 'Sección' : 'Section'}: {sectionLabel}
+              </div>
+            )}
+          </div>
+
           <span className="shrink-0 rounded-full bg-neon-500/10 px-2 py-1 font-display text-[10px] uppercase tracking-wider text-neon-300">
-            {equipmentLabel(exercise.equipment, t)}
+            {equipmentLabel(exercise.equipment, t, lang)}
           </span>
         </div>
 
@@ -53,10 +116,28 @@ export function ExerciseCard({ exercise, index }) {
             {t.exercise.instructions}
             <span className="ml-1 text-neon-400">{expanded ? '▴' : '▾'}</span>
           </button>
+
           <button onClick={() => setShowLog((v) => !v)} className="btn-ghost flex-1 py-2 text-sm">
             {t.exercise.logSet}
           </button>
         </div>
+
+        {onReplace && (
+          <button
+            type="button"
+            onClick={onReplace}
+            disabled={replacing}
+            className="btn-ghost w-full py-2 text-sm disabled:opacity-50"
+          >
+            {replacing
+              ? lang === 'es'
+                ? 'Buscando alternativa…'
+                : 'Finding alternative…'
+              : lang === 'es'
+                ? 'Cambiar este ejercicio'
+                : 'Replace this exercise'}
+          </button>
+        )}
 
         <a
           href={ytUrl}
@@ -84,11 +165,6 @@ export function ExerciseCard({ exercise, index }) {
   );
 }
 
-/**
- * ExerciseImage — alternates between the start (images[0]) and end (images[1])
- * pose every ~700ms to fake a motion GIF. Falls back to a static image or an
- * icon if loading fails.
- */
 function ExerciseImage({ exercise, alt }) {
   const images =
     Array.isArray(exercise.images) && exercise.images.length > 0
@@ -102,7 +178,9 @@ function ExerciseImage({ exercise, alt }) {
 
   useEffect(() => {
     if (images.length < 2) return undefined;
+
     const id = setInterval(() => setFrame((f) => (f + 1) % images.length), 700);
+
     return () => clearInterval(id);
   }, [images.length]);
 
@@ -118,8 +196,6 @@ function ExerciseImage({ exercise, alt }) {
 
   return (
     <div className="relative aspect-[16/10] w-full overflow-hidden bg-white">
-      {/* Render all images stacked; fade between them. This avoids flicker
-          while loading and gives a smoother visual than swapping `src`. */}
       {images.map((src, i) => (
         <img
           key={src}
@@ -158,6 +234,7 @@ function SetLogger({ exercise, onLogged }) {
 
   async function submit() {
     setBusy(true);
+
     try {
       await addLog({
         exercise_id: exercise.id,
@@ -167,6 +244,7 @@ function SetLogger({ exercise, onLogged }) {
         reps: reps ? Number(reps) : null,
         notes: notes || null,
       });
+
       setDone(true);
       setTimeout(() => onLogged?.(), 600);
     } catch (e) {
@@ -190,6 +268,7 @@ function SetLogger({ exercise, onLogged }) {
             placeholder="0"
           />
         </div>
+
         <div>
           <label className="label">{t.common.reps}</label>
           <input
@@ -200,6 +279,7 @@ function SetLogger({ exercise, onLogged }) {
             placeholder="0"
           />
         </div>
+
         <div>
           <label className="label">&nbsp;</label>
           <select
@@ -212,6 +292,7 @@ function SetLogger({ exercise, onLogged }) {
           </select>
         </div>
       </div>
+
       <div className="mt-2">
         <label className="label">{t.exercise.notes}</label>
         <input
@@ -221,6 +302,7 @@ function SetLogger({ exercise, onLogged }) {
           placeholder=""
         />
       </div>
+
       <button onClick={submit} disabled={busy || done} className="btn-primary mt-3 w-full py-2 text-sm">
         {done ? `✓ ${t.common.saved}` : busy ? t.common.loading : t.common.save}
       </button>
