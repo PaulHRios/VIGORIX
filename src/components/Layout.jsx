@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../hooks/useLanguage.jsx';
 import { LanguageToggle } from './LanguageToggle.jsx';
 import { useDisclaimer } from '../hooks/useDisclaimer.jsx';
@@ -14,18 +14,29 @@ export function Layout() {
   const { t } = useLanguage();
   const { open } = useDisclaimer();
   const loc = useLocation();
+  const navigate = useNavigate();
+
+  function resetChatFromLogo() {
+    navigate('/');
+    window.dispatchEvent(new Event('vigorix:reset-chat'));
+  }
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col">
-      {/* Top bar */}
       <header className="safe-top sticky top-0 z-30 flex items-center justify-between border-b border-white/5 bg-ink-950/80 px-5 py-3 backdrop-blur-md">
-        <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={resetChatFromLogo}
+          className="flex items-center gap-2"
+          aria-label="Reset chat"
+        >
           <Logo />
           <span className="font-display text-lg font-semibold tracking-tight">
             {t.appName}
             <span className="text-neon-400">.</span>
           </span>
-        </div>
+        </button>
+
         <div className="flex items-center gap-2">
           <button
             onClick={open}
@@ -34,20 +45,20 @@ export function Layout() {
           >
             i
           </button>
+
           <LanguageToggle />
         </div>
       </header>
 
-      {/* Page */}
       <main key={loc.pathname} className="flex-1 animate-fade-in pb-28">
         <Outlet />
       </main>
 
-      {/* Bottom nav */}
       <nav className="safe-bottom fixed bottom-0 left-1/2 z-40 w-full max-w-md -translate-x-1/2 px-3 pb-2 pt-1">
         <div className="flex items-center justify-around rounded-3xl border border-white/10 bg-ink-900/85 px-2 py-1.5 shadow-2xl backdrop-blur-xl">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
+
             return (
               <NavLink
                 key={item.to}
@@ -92,6 +103,7 @@ function ChatIcon({ className }) {
     </svg>
   );
 }
+
 function BookmarkIcon({ className }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -99,6 +111,7 @@ function BookmarkIcon({ className }) {
     </svg>
   );
 }
+
 function ChartIcon({ className }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -106,6 +119,7 @@ function ChartIcon({ className }) {
     </svg>
   );
 }
+
 function UserIcon({ className }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
