@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChatInput } from '../components/ChatInput.jsx';
 import { ChatMessage } from '../components/ChatMessage.jsx';
 import { ExerciseCard } from '../components/ExerciseCard.jsx';
@@ -7,7 +7,13 @@ import { WarningBanner } from '../components/WarningBanner.jsx';
 import { useLanguage } from '../hooks/useLanguage.jsx';
 import { detectConditions } from '../data/conditions.js';
 import { getExercises } from '../services/exerciseService.js';
-import { generateRoutine, parseRequestText } from '../utils/workoutGenerator.js';
+import {
+  buildClarifyingQuestion,
+  generateRoutine,
+  getMissingRequestFields,
+  mergeRequestDraft,
+  parseRequestText,
+} from '../utils/workoutGenerator.js';
 import { saveRoutine } from '../services/storageService.js';
 import { exportRoutinePdf } from '../utils/pdfExport.js';
 
@@ -21,9 +27,9 @@ export function ChatPage() {
   const [pool, setPool] = useState([]);
   const [savedName, setSavedName] = useState('');
   const [savedFlash, setSavedFlash] = useState(false);
+  const [draftRequest, setDraftRequest] = useState(null);
   const scrollRef = useRef(null);
 
-  // Greet on mount.
   useEffect(() => {
     setMessages([
       {
@@ -34,41 +40,75 @@ export function ChatPage() {
             : "Hi! Tell me what kind of workout you want and I'll build it. You can also use the guided form.",
       },
     ]);
+    setDraftRequest(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lang]);
 
-  // Load exercise pool once.
   useEffect(() => {
     getExercises().then(setPool);
   }, []);
 
-  // Autoscroll on new messages or routine.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, routine]);
 
   async function handleFreeText() {
     const text = input.trim();
+
     if (!text) return;
+
     setInput('');
     setMessages((m) => [...m, { role: 'user', text }]);
-    await generateFromRequest(parseRequestText(text), text);
+
+    const parsed = parseRequestText(text);
+    const combined = draftRequest ? mergeRequestDraft(draftRequest, parsed) : parsed;
+    const missing = getMissingRequestFields(combined);
+
+    if (missing.length > 0) {
+      const question = buildClarifyingQuestion(combined, lang);
+
+      setDraftRequest(combined);
+      setMessages((m) => [
+        ...m,
+        {
+          role: 'assistant',
+          text: question,
+        },
+      ]);
+
+      return;
+    }
+
+    setDraftRequest(null);
+    await generateFromRequest(combined, combined.condition || text);
   }
 
   async function handleGuided(values) {
+    setDraftRequest(null);
     setShowGuided(false);
+
     const summary = formatRequestSummary(values, t);
+
     setMessages((m) => [...m, { role: 'user', text: summary }]);
+
     await generateFromRequest(values, values.condition || '');
   }
 
   async function generateFromRequest(req, conditionText) {
     setBusy(true);
+
     try {
-      // Simulate "thinking" so the UX matches a chat.
       await new Promise((r) => setTimeout(r, 350));
-      const conditions = detectConditions(conditionText);
-      const result = generateRoutine(req, pool, conditions);
+
+      let exercisePool = pool;
+
+      if (!exercisePool || exercisePool.length === 0) {
+        exercisePool = await getExercises();
+        setPool(exercisePool);
+      }
+
+      const conditions = detectConditions(conditionText || req.condition || '');
+      const result = generateRoutine(req, exercisePool, conditions);
 
       if (result.empty) {
         setMessages((m) => [...m, { role: 'assistant', text: t.chat.noResults }]);
@@ -77,10 +117,9 @@ export function ChatPage() {
       }
 
       setRoutine(result);
-      const summary =
-        lang === 'es'
-          ? `Listo. Armé una rutina de ${result.exercises.length} ejercicios.`
-          : `Done. Built a routine with ${result.exercises.length} exercises.`;
+
+      const summary = buildRoutineSummary(result, lang);
+
       setMessages((m) => [...m, { role: 'assistant', text: summary }]);
       setSavedName('');
     } finally {
@@ -90,7 +129,9 @@ export function ChatPage() {
 
   async function handleSave() {
     if (!routine) return;
+
     const name = savedName.trim() || `${t.saved.defaultName} · ${new Date().toLocaleDateString()}`;
+
     try {
       await saveRoutine(name, routine);
       setSavedFlash(true);
@@ -103,6 +144,7 @@ export function ChatPage() {
 
   function handleExport() {
     if (!routine) return;
+
     const name = savedName.trim() || t.saved.defaultName;
     exportRoutinePdf(routine, lang, name);
   }
@@ -141,6 +183,7 @@ export function ChatPage() {
               <h2 className="heading-display text-sm uppercase tracking-[0.2em] text-neutral-400">
                 {t.chat.generated}
               </h2>
+
               <span className="font-mono text-xs text-neutral-500">
                 {routine.exercises.length} ·{' '}
                 {Math.round(routine.exercises.reduce((s, e) => s + e.sets * 60, 0) / 60)}m
@@ -158,10 +201,12 @@ export function ChatPage() {
                 value={savedName}
                 onChange={(e) => setSavedName(e.target.value)}
               />
+
               <div className="flex gap-2">
                 <button onClick={handleSave} className="btn-primary flex-1">
                   {savedFlash ? `✓ ${t.common.saved}` : t.saved.saveBtn}
                 </button>
+
                 <button onClick={handleExport} className="btn-ghost flex-1">
                   {t.common.export}
                 </button>
@@ -186,6 +231,33 @@ export function ChatPage() {
   );
 }
 
+function buildRoutineSummary(result, lang) {
+  const count = result.exercises.length;
+  const requested = result.requestedCount;
+
+  if (lang === 'es') {
+    if (requested && count < requested) {
+      return `Listo. Encontré ${count} ejercicios válidos de ${requested} solicitados. No rellené con ejercicios que no cumplen tus filtros.`;
+    }
+
+    if (result.conditionKeys?.length > 0) {
+      return `Listo. Armé una rutina de ${count} ejercicios ajustada por seguridad.`;
+    }
+
+    return `Listo. Armé una rutina de ${count} ejercicios.`;
+  }
+
+  if (requested && count < requested) {
+    return `Done. Found ${count} valid exercises out of ${requested} requested. I did not fill the routine with exercises that violate your filters.`;
+  }
+
+  if (result.conditionKeys?.length > 0) {
+    return `Done. Built a ${count}-exercise routine with safety adjustments.`;
+  }
+
+  return `Done. Built a routine with ${count} exercises.`;
+}
+
 function formatRequestSummary(v, t) {
   const parts = [
     t.form.goals[v.goal] || v.goal,
@@ -194,6 +266,8 @@ function formatRequestSummary(v, t) {
     `${v.time}${t.common.minutes}`,
     t.form.levels[v.level] || v.level,
   ];
+
   if (v.condition) parts.push(`(${v.condition})`);
+
   return parts.join(' · ');
 }
