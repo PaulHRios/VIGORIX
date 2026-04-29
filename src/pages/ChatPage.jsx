@@ -8,11 +8,13 @@ import { useLanguage } from '../hooks/useLanguage.jsx';
 import { detectConditions } from '../data/conditions.js';
 import { getExercises } from '../services/exerciseService.js';
 import {
+  applyAnswerToClarifyingField,
   buildClarifyingQuestion,
   generateRoutine,
-  getMissingRequestFields,
+  getNextClarifyingField,
   mergeRequestDraft,
   parseRequestText,
+  replaceExerciseInRoutine,
 } from '../utils/workoutGenerator.js';
 import { saveRoutine } from '../services/storageService.js';
 import { exportRoutinePdf } from '../utils/pdfExport.js';
@@ -28,19 +30,45 @@ export function ChatPage() {
   const [savedName, setSavedName] = useState('');
   const [savedFlash, setSavedFlash] = useState(false);
   const [draftRequest, setDraftRequest] = useState(null);
+  const [pendingField, setPendingField] = useState(null);
+  const [replacingIndex, setReplacingIndex] = useState(null);
   const scrollRef = useRef(null);
 
-  useEffect(() => {
-    setMessages([
-      {
-        role: 'assistant',
-        text:
-          lang === 'es'
-            ? '¡Hola! Cuéntame qué tipo de entrenamiento quieres y lo armo. También puedes usar el formulario.'
-            : "Hi! Tell me what kind of workout you want and I'll build it. You can also use the guided form.",
-      },
-    ]);
+  function initialGreeting() {
+    return {
+      role: 'assistant',
+      text:
+        lang === 'es'
+          ? '¡Hola! Dime qué rutina quieres y te voy preguntando lo necesario para armarla bien.'
+          : "Hi! Tell me what routine you want and I'll ask what I need to build it properly.",
+    };
+  }
+
+  function resetChat() {
+    setMessages([initialGreeting()]);
+    setInput('');
+    setShowGuided(false);
+    setBusy(false);
+    setRoutine(null);
+    setSavedName('');
+    setSavedFlash(false);
     setDraftRequest(null);
+    setPendingField(null);
+    setReplacingIndex(null);
+  }
+
+  useEffect(() => {
+    resetChat();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang]);
+
+  useEffect(() => {
+    function onReset() {
+      resetChat();
+    }
+
+    window.addEventListener('vigorix:reset-chat', onReset);
+    return () => window.removeEventListener('vigorix:reset-chat', onReset);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lang]);
 
@@ -61,18 +89,22 @@ export function ChatPage() {
     setMessages((m) => [...m, { role: 'user', text }]);
 
     const parsed = parseRequestText(text);
-    const combined = draftRequest ? mergeRequestDraft(draftRequest, parsed) : parsed;
-    const missing = getMissingRequestFields(combined);
+    const combined = pendingField
+      ? applyAnswerToClarifyingField(draftRequest || {}, parsed, pendingField, text)
+      : draftRequest
+        ? mergeRequestDraft(draftRequest, parsed)
+        : parsed;
 
-    if (missing.length > 0) {
-      const question = buildClarifyingQuestion(combined, lang);
+    const nextField = getNextClarifyingField(combined);
 
+    if (nextField) {
       setDraftRequest(combined);
+      setPendingField(nextField);
       setMessages((m) => [
         ...m,
         {
           role: 'assistant',
-          text: question,
+          text: buildClarifyingQuestion(combined, lang, nextField),
         },
       ]);
 
@@ -80,18 +112,24 @@ export function ChatPage() {
     }
 
     setDraftRequest(null);
+    setPendingField(null);
     await generateFromRequest(combined, combined.condition || text);
   }
 
   async function handleGuided(values) {
     setDraftRequest(null);
+    setPendingField(null);
     setShowGuided(false);
 
-    const summary = formatRequestSummary(values, t);
+    const normalizedValues = {
+      ...values,
+      conditionStatus: values.condition ? 'described' : 'none',
+    };
 
+    const summary = formatRequestSummary(normalizedValues, t);
     setMessages((m) => [...m, { role: 'user', text: summary }]);
 
-    await generateFromRequest(values, values.condition || '');
+    await generateFromRequest(normalizedValues, normalizedValues.condition || '');
   }
 
   async function generateFromRequest(req, conditionText) {
@@ -117,13 +155,45 @@ export function ChatPage() {
       }
 
       setRoutine(result);
-
-      const summary = buildRoutineSummary(result, lang);
-
-      setMessages((m) => [...m, { role: 'assistant', text: summary }]);
+      setMessages((m) => [...m, { role: 'assistant', text: buildRoutineSummary(result, lang) }]);
       setSavedName('');
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleReplaceExercise(index) {
+    if (!routine) return;
+
+    setReplacingIndex(index);
+
+    try {
+      let exercisePool = pool;
+
+      if (!exercisePool || exercisePool.length === 0) {
+        exercisePool = await getExercises();
+        setPool(exercisePool);
+      }
+
+      const nextRoutine = replaceExerciseInRoutine(routine, index, exercisePool);
+
+      if (!nextRoutine) {
+        setMessages((m) => [
+          ...m,
+          {
+            role: 'assistant',
+            text:
+              lang === 'es'
+                ? 'No encontré una alternativa válida para ese ejercicio con tus filtros actuales.'
+                : 'I could not find a valid alternative for that exercise with your current filters.',
+          },
+        ]);
+        return;
+      }
+
+      setRoutine(nextRoutine);
+    } finally {
+      setReplacingIndex(null);
     }
   }
 
@@ -191,7 +261,13 @@ export function ChatPage() {
             </div>
 
             {routine.exercises.map((ex, i) => (
-              <ExerciseCard key={ex.id + '_' + i} exercise={ex} index={i} />
+              <ExerciseCard
+                key={ex.id + '_' + i}
+                exercise={ex}
+                index={i}
+                onReplace={() => handleReplaceExercise(i)}
+                replacing={replacingIndex === i}
+              />
             ))}
 
             <div className="card space-y-2 p-4">
@@ -219,6 +295,14 @@ export function ChatPage() {
       </div>
 
       <div className="px-4 pb-2 pt-2">
+        <button
+          type="button"
+          onClick={resetChat}
+          className="mb-2 w-full rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-2 font-display text-xs uppercase tracking-wider text-neutral-400"
+        >
+          {lang === 'es' ? 'Borrar chat' : 'Clear chat'}
+        </button>
+
         <ChatInput
           value={input}
           onChange={setInput}
@@ -237,7 +321,7 @@ function buildRoutineSummary(result, lang) {
 
   if (lang === 'es') {
     if (requested && count < requested) {
-      return `Listo. Encontré ${count} ejercicios válidos de ${requested} solicitados. No rellené con ejercicios que no cumplen tus filtros.`;
+      return `Listo. Encontré ${count} ejercicios válidos de ${requested} solicitados. No rellené con ejercicios que rompen tus filtros.`;
     }
 
     if (result.conditionKeys?.length > 0) {
@@ -259,11 +343,14 @@ function buildRoutineSummary(result, lang) {
 }
 
 function formatRequestSummary(v, t) {
+  const muscles = Array.isArray(v.muscles) ? v.muscles : [v.muscle || 'full_body'];
+  const equipment = Array.isArray(v.equipment) ? v.equipment : [v.equipment || 'any'];
+
   const parts = [
     t.form.goals[v.goal] || v.goal,
-    t.form.muscles[v.muscle] || v.muscle,
-    t.form.equipments[v.equipment] || v.equipment,
-    `${v.time}${t.common.minutes}`,
+    muscles.map((m) => t.form.muscles[m] || m).join(' + '),
+    equipment.map((e) => t.form.equipments[e] || e).join(' + '),
+    v.exerciseCount ? `${v.exerciseCount} ejercicios` : `${v.time}${t.common.minutes}`,
     t.form.levels[v.level] || v.level,
   ];
 
