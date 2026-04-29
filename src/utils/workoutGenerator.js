@@ -116,6 +116,17 @@ const SCHEMES = {
   general: { sets: 3, reps: '10-12', rest: 60 },
 };
 
+const ALL_REAL_EQUIPMENT = [
+  'none',
+  'dumbbells',
+  'barbell',
+  'bands',
+  'kettlebell',
+  'exercise_ball',
+  'medicine_ball',
+  'machines',
+];
+
 function clampExerciseCount(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return null;
@@ -134,10 +145,13 @@ function exerciseCountForTime(minutes) {
 
 function adjustReps(repsStr, modifier) {
   if (modifier >= 1) return repsStr;
+
   const m = repsStr.match(/^(\d+)-(\d+)$/);
   if (!m) return repsStr;
+
   const lo = Math.max(4, Math.round(parseInt(m[1], 10) * modifier));
   const hi = Math.max(lo + 2, Math.round(parseInt(m[2], 10) * modifier));
+
   return `${lo}-${hi}`;
 }
 
@@ -205,22 +219,30 @@ export function normalizeRequest(request = {}) {
 
 function equipmentMatches(ex, requestedEquipment) {
   const eq = normalizeEquipment(requestedEquipment);
+
   if (eq.includes('any')) return true;
+
   return eq.includes(ex.equipment);
 }
 
 function primaryMuscleMatches(ex, requestedMuscle) {
   if (!requestedMuscle || requestedMuscle === 'full_body') return true;
+
   const allowed = MUSCLE_PRIMARY[requestedMuscle];
+
   if (!allowed) return true;
+
   const primary = ex.primaryMuscles || [];
+
   return primary.some((m) => allowed.includes(m));
 }
 
 function muscleTagsMatch(ex, requestedMuscle) {
   if (!requestedMuscle || requestedMuscle === 'full_body') return true;
+
   const muscles = ex.muscle || [];
   const allowed = MUSCLE_PRIMARY[requestedMuscle] || [];
+
   return muscles.includes(requestedMuscle) || muscles.some((m) => allowed.includes(m));
 }
 
@@ -337,6 +359,7 @@ function scoreExercise(ex, req, avoidTags, targetMuscle = null, preferredSection
   if (equipmentMatches(ex, req.equipment)) score += 4;
 
   const section = inferMuscleSection(ex, targetMuscle).key;
+
   if (preferredSection && section === preferredSection) score += 18;
 
   score += Math.random() * 0.5;
@@ -346,6 +369,7 @@ function scoreExercise(ex, req, avoidTags, targetMuscle = null, preferredSection
 
 function allocateCounts(muscles, total) {
   const targets = unique(muscles);
+
   if (targets.length === 0) return [];
   if (targets.length === 1) return [{ muscle: targets[0], count: total }];
 
@@ -382,6 +406,7 @@ function allocateCounts(muscles, total) {
       .sort((a, b) => a.weight - b.weight)[0];
 
     if (!removable) break;
+
     removable.count -= 1;
   }
 
@@ -453,7 +478,14 @@ export function generateRoutine(request, exercises, conditionKeys = []) {
     const sections = sectionSequenceFor(allocation.muscle, allocation.count);
 
     for (const sectionKey of sections) {
-      let selected = chooseBestExercise(baseScored, req, avoidTags, chosen, allocation.muscle, sectionKey);
+      let selected = chooseBestExercise(
+        baseScored,
+        req,
+        avoidTags,
+        chosen,
+        allocation.muscle,
+        sectionKey,
+      );
 
       if (!selected) {
         selected = chooseBestExercise(baseScored, req, avoidTags, chosen, allocation.muscle, null);
@@ -462,6 +494,7 @@ export function generateRoutine(request, exercises, conditionKeys = []) {
       if (!selected) continue;
 
       const section = inferMuscleSection(selected, allocation.muscle);
+
       chosen.push(buildPrescription(selected, req, intensity, allocation.muscle, section));
     }
   }
@@ -472,6 +505,7 @@ export function generateRoutine(request, exercises, conditionKeys = []) {
       if (isDuplicateExercise(ex, chosen)) continue;
 
       const targetMuscle = req.muscles.find((m) => primaryMuscleMatches(ex, m)) || req.muscles[0];
+
       chosen.push(buildPrescription(ex, req, intensity, targetMuscle));
     }
   }
@@ -496,6 +530,115 @@ function addIfMatch(list, t, re, value) {
   if (re.test(t) && !list.includes(value)) list.push(value);
 }
 
+function hasNegatedEquipment(t, keywordPattern) {
+  const re = new RegExp(
+    `(?:no tengo|no hay|sin|excepto|menos|lo unico que no tengo|lo único que no tengo)[^.!?,;]{0,45}${keywordPattern}`,
+    'i',
+  );
+
+  return re.test(t);
+}
+
+function addEquipmentIfMentioned(list, t, keywordPattern, value) {
+  const re = new RegExp(keywordPattern, 'i');
+
+  if (!re.test(t)) return;
+  if (hasNegatedEquipment(t, keywordPattern)) return;
+
+  if (!list.includes(value)) list.push(value);
+}
+
+function parseEquipmentFromText(t) {
+  const equipment = [];
+
+  const saysOnlyMissingMachines =
+    /\blo [uú]nico que no tengo\b/.test(t) &&
+    /\b(machines?|m[aá]quinas?|maquinas?|gym|gimnasio|polea|cable|cables)\b/.test(t);
+
+  if (saysOnlyMissingMachines) {
+    return ALL_REAL_EQUIPMENT.filter((item) => item !== 'machines');
+  }
+
+  if (
+    /\b(no equipment|sin equipo|sin material|bodyweight|peso corporal|sin pesas|sin gym|sin gimnasio|en casa|at home|home workout|casa)\b/.test(
+      t,
+    )
+  ) {
+    equipment.push('none');
+  }
+
+  addEquipmentIfMentioned(
+    equipment,
+    t,
+    '\\b(dumbbell|dumbbells|mancuernas?|pesas? de mano)\\b',
+    'dumbbells',
+  );
+
+  addEquipmentIfMentioned(
+    equipment,
+    t,
+    '\\b(barbell|barra ol[ií]mpica|con barra)\\b',
+    'barbell',
+  );
+
+  addEquipmentIfMentioned(
+    equipment,
+    t,
+    '\\b(bands?|bandas?|elasticos?|el[aá]sticas?|tubular)\\b',
+    'bands',
+  );
+
+  addEquipmentIfMentioned(
+    equipment,
+    t,
+    '\\b(kettlebell|pesa rusa|kettle)\\b',
+    'kettlebell',
+  );
+
+  addEquipmentIfMentioned(
+    equipment,
+    t,
+    '\\b(pelota de ejercicio|pelota|exercise ball|swiss ball|stability ball)\\b',
+    'exercise_ball',
+  );
+
+  addEquipmentIfMentioned(
+    equipment,
+    t,
+    '\\b(bal[oó]n medicinal|medicine ball)\\b',
+    'medicine_ball',
+  );
+
+  addEquipmentIfMentioned(
+    equipment,
+    t,
+    '\\b(machines?|m[aá]quinas?|maquinas?|gym|gimnasio|polea|cable|cables)\\b',
+    'machines',
+  );
+
+  return unique(equipment);
+}
+
+function parseConditionStatusFromText(t) {
+  if (
+    /\b(sin lesiones|sin lesi[oó]n|sin dolor|no injuries|no injury|no pain|no medical condition|sin condici[oó]n médica|ninguna lesi[oó]n|ning[uú]n dolor)\b/.test(
+      t,
+    )
+  ) {
+    return 'none';
+  }
+
+  if (
+    /\b(dolor|lesi[oó]n|lesion|rodilla|espalda|hombro|embaraz|pregnan|pain|injur|knee|back pain|shoulder pain|shoulder injury)\b/.test(
+      t,
+    )
+  ) {
+    return 'described';
+  }
+
+  return null;
+}
+
 export function parseRequestText(text) {
   const t = (text || '').toLowerCase();
   const muscles = [];
@@ -515,10 +658,15 @@ export function parseRequestText(text) {
   if (countMatch) req.exerciseCount = clampExerciseCount(countMatch[1]);
 
   if (/\b(strength|fuerza)\b/.test(t)) req.goal = 'strength';
-  else if (/\b(hypertrophy|muscle|hipertrofia|m[uú]sculo|masa|crecer|volumen)\b/.test(t)) req.goal = 'hypertrophy';
-  else if (/\b(endurance|cardio|resistencia|aer[oó]bico)\b/.test(t)) req.goal = 'endurance';
-  else if (/\b(fat ?loss|weight ?loss|adelgaza|grasa|perder peso|definici[oó]n|quemar)\b/.test(t)) req.goal = 'fatloss';
-  else if (/\b(mobility|stretch|movilidad|estirar|flexibilidad|elasticidad)\b/.test(t)) req.goal = 'mobility';
+  else if (/\b(hypertrophy|muscle|hipertrofia|m[uú]sculo|masa|crecer|volumen)\b/.test(t)) {
+    req.goal = 'hypertrophy';
+  } else if (/\b(endurance|cardio|resistencia|aer[oó]bico)\b/.test(t)) {
+    req.goal = 'endurance';
+  } else if (/\b(fat ?loss|weight ?loss|adelgaza|grasa|perder peso|definici[oó]n|quemar)\b/.test(t)) {
+    req.goal = 'fatloss';
+  } else if (/\b(mobility|stretch|movilidad|estirar|flexibilidad|elasticidad)\b/.test(t)) {
+    req.goal = 'mobility';
+  }
 
   addIfMatch(muscles, t, /\b(pecho|chest|pectorales?|pecs)\b/, 'chest');
   addIfMatch(muscles, t, /\b(espalda|back)\b/, 'back');
@@ -540,17 +688,7 @@ export function parseRequestText(text) {
   addIfMatch(muscles, t, /\b(tir[oó]n|pull|tirar|jalar)\b/, 'pull');
   addIfMatch(muscles, t, /\b(full[- ]?body|cuerpo completo|todo el cuerpo|cuerpo entero)\b/, 'full_body');
 
-  if (/\b(no equipment|sin equipo|sin material|bodyweight|peso corporal|sin pesas|sin m[aá]quinas?|sin gym|sin gimnasio|en casa|at home|home workout|casa)\b/.test(t)) {
-    equipment.push('none');
-  }
-
-  if (/\b(dumbbell|dumbbells|mancuernas?|pesas? de mano)\b/.test(t)) equipment.push('dumbbells');
-  if (/\b(barbell|barra ol[ií]mpica|con barra)\b/.test(t)) equipment.push('barbell');
-  if (/\b(bands?|bandas?|elasticos?|el[aá]sticas?|tubular)\b/.test(t)) equipment.push('bands');
-  if (/\b(kettlebell|pesa rusa|kettle)\b/.test(t)) equipment.push('kettlebell');
-  if (/\b(machines?|m[aá]quinas?|gym|gimnasio|polea|cable|cables)\b/.test(t)) equipment.push('machines');
-  if (/\b(pelota de ejercicio|pelota|exercise ball|swiss ball|stability ball)\b/.test(t)) equipment.push('exercise_ball');
-  if (/\b(bal[oó]n medicinal|medicine ball)\b/.test(t)) equipment.push('medicine_ball');
+  equipment.push(...parseEquipmentFromText(t));
 
   const minMatch = t.match(/(\d{1,3})\s*(min|minute|minuto)/);
 
@@ -564,14 +702,18 @@ export function parseRequestText(text) {
     else if (/\b(long|largo|extenso|completo)\b/.test(t)) req.time = 60;
   }
 
-  if (/\b(beginner|principiante|nuevo|novato|empezando|baja intensidad|suave)\b/.test(t)) req.level = 'beginner';
-  else if (/\b(intermediate|intermedio|medio|moderado|media intensidad)\b/.test(t)) req.level = 'intermediate';
-  else if (/\b(advanced|avanzado|experto|atleta|alta intensidad|intenso)\b/.test(t)) req.level = 'advanced';
+  if (/\b(beginner|principiante|nuevo|novato|empezando|baja intensidad|suave)\b/.test(t)) {
+    req.level = 'beginner';
+  } else if (/\b(intermediate|intermedio|medio|moderado|media intensidad)\b/.test(t)) {
+    req.level = 'intermediate';
+  } else if (/\b(advanced|avanzado|experto|atleta|alta intensidad|intenso)\b/.test(t)) {
+    req.level = 'advanced';
+  }
 
-  if (/\b(sin lesiones|sin lesi[oó]n|sin dolor|no injuries|no injury|no pain|ninguna|nada|no)\b/.test(t)) {
-    req.conditionStatus = 'none';
-  } else if (/\b(dolor|lesi[oó]n|lesion|rodilla|espalda|hombro|embaraz|pregnan|pain|injur|knee|back|shoulder)\b/.test(t)) {
-    req.conditionStatus = 'described';
+  const conditionStatus = parseConditionStatusFromText(t);
+
+  if (conditionStatus) {
+    req.conditionStatus = conditionStatus;
   }
 
   req.muscles = muscles.length ? unique(muscles) : ['full_body'];
@@ -606,7 +748,11 @@ export function applyAnswerToClarifyingField(previous, parsed, field, rawText = 
   const next = { ...parsed };
 
   if (field === 'condition') {
-    if (/\b(no|nada|ninguna|sin lesiones|sin lesi[oó]n|sin dolor|no pain|no injury|no injuries)\b/i.test(rawText)) {
+    if (
+      /\b(no|nada|ninguna|sin lesiones|sin lesi[oó]n|sin dolor|no pain|no injury|no injuries|ninguna lesi[oó]n|ning[uú]n dolor)\b/i.test(
+        rawText,
+      )
+    ) {
       next.conditionStatus = 'none';
       next.condition = '';
     } else {
@@ -655,7 +801,9 @@ export function buildClarifyingQuestion(request = {}, lang = 'en', field = null)
 
 export function replaceExerciseInRoutine(routine, index, exercises) {
   if (!routine || !Array.isArray(routine.exercises)) return null;
+
   const current = routine.exercises[index];
+
   if (!current) return null;
 
   const req = normalizeRequest(routine.request);
@@ -695,6 +843,7 @@ export function replaceExerciseInRoutine(routine, index, exercises) {
   if (!replacement) return null;
 
   const nextExercises = [...routine.exercises];
+
   nextExercises[index] = {
     ...buildPrescription(replacement, req, intensity, targetMuscle),
     sets: current.sets,
@@ -711,5 +860,6 @@ export function replaceExerciseInRoutine(routine, index, exercises) {
 export function youtubeSearchUrl(exerciseName, lang = 'en') {
   const prefix = lang === 'es' ? 'cómo hacer ' : 'how to do ';
   const q = encodeURIComponent(`${prefix}${exerciseName}`);
+
   return `https://www.youtube.com/results?search_query=${q}`;
 }
