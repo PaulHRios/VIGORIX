@@ -1,3 +1,4 @@
+// src/data/translations.js
 // All UI strings live here. Add a key once, translate twice.
 
 export const translations = {
@@ -6,7 +7,7 @@ export const translations = {
     tagline: 'Smart workouts. Built for your body.',
 
     nav: {
-      chat: 'Chat',
+      builder: 'Builder',
       saved: 'Saved',
       progress: 'Progress',
       account: 'Account',
@@ -21,6 +22,9 @@ export const translations = {
       confirm: 'Confirm',
       close: 'Close',
       back: 'Back',
+      next: 'Next',
+      done: 'Done',
+      retry: 'Retry',
       loading: 'Loading…',
       empty: 'Nothing here yet.',
       minutes: 'min',
@@ -29,79 +33,134 @@ export const translations = {
       reps: 'reps',
       rest: 'rest',
       export: 'Export PDF',
-      done: 'Done',
-      next: 'Next',
-      retry: 'Retry',
       optional: 'optional',
-      loadingExercises: 'Loading exercise database…',
+      continue: 'Continue',
+      generate: 'Generate routine',
+      day: 'Day',
+      days: 'Days',
     },
 
     onboarding: {
-      title: 'Welcome to VIGORIX',
-      sub: 'Generate safe, structured workouts in seconds. Free, bilingual, no account required.',
-      cta: 'Get started',
+      welcome: 'Welcome to VIGORIX',
+      sub: 'Answer 5 quick questions to get a routine built for you.',
+      step: 'Step',
+      of: 'of',
+
+      sexQ: 'What is your biological sex?',
+      sex: {
+        male: 'Male',
+        female: 'Female',
+        other: 'Prefer not to say',
+      },
+
+      ageQ: 'How old are you?',
+      agePlaceholder: 'Age',
+      ageHint: 'Used to adjust intensity, never shared.',
+      ageError: 'Please enter a valid age (10-99).',
+
+      goalQ: 'What is your main goal?',
+      goals: {
+        strength: 'Strength',
+        hypertrophy: 'Build muscle',
+        endurance: 'Endurance',
+        fatloss: 'Lose fat',
+        mobility: 'Mobility',
+        general: 'Stay in shape',
+      },
+      goalHint: {
+        strength: 'Heavy weights, low reps, long rest.',
+        hypertrophy: 'Moderate weights, 8–12 reps, ~75 s rest.',
+        endurance: 'Light weights, high reps, short rest.',
+        fatloss: 'High volume, short rest.',
+        mobility: 'Slow, controlled, no heavy load.',
+        general: 'Balanced overall fitness.',
+      },
+
+      levelQ: 'What is your training level?',
+      levels: {
+        beginner: 'Beginner',
+        balanced: 'Balanced',
+        advanced: 'Advanced',
+        gym_rat: 'Gym rat',
+      },
+      levelHint: {
+        beginner: 'Simple movements, no advanced techniques.',
+        balanced: 'Moderate volume, all common movements.',
+        advanced: 'Higher volume, controlled intensity.',
+        gym_rat: 'Supersets, drop sets, max stimulus.',
+      },
+
+      equipmentQ: 'What equipment do you have?',
+      equipmentHint: 'Pick all that apply. We will only suggest exercises you can actually do.',
+
+      conditionQ: 'Any injury or condition we should know about?',
+      conditionPlaceholder: 'e.g. knee pain, pregnancy, lower back. Leave empty if none.',
+      conditionSkip: 'Skip',
+
+      finish: 'Save & continue',
     },
 
-    disclaimer: {
-      title: 'Important: This is not medical advice',
-      body:
-        'VIGORIX provides general fitness suggestions for informational purposes only. It is not a substitute for medical advice, diagnosis, or treatment. Always consult a qualified healthcare professional before starting any exercise program, especially if you are pregnant, recovering from injury, or have any medical condition. You are solely responsible for your use of this information.',
-      ack: 'I understand and accept',
-      revisit: 'View disclaimer',
-    },
-
-    chat: {
+    builder: {
       title: 'Plan a workout',
-      placeholder: 'e.g. chest and back, 8 exercises, dumbbells and barbell',
-      hintPrompt: 'Or use the guided form',
-      generate: 'Generate workout',
-      regenerate: 'Regenerate',
-      thinking: 'Building your routine…',
-      yourRequest: 'Your request',
-      generated: 'Your workout',
-      clear: 'Clear chat',
-      replaceExercise: 'Replace this exercise',
-      replacingExercise: 'Finding alternative…',
-      noAlternative: 'I could not find a valid alternative with your current filters.',
-      noResults:
-        "I couldn't find exercises that match all those filters. Try fewer constraints, more equipment options, or a different muscle group.",
-      welcome:
-        "Hi! Tell me what routine you want and I'll ask what I need to build it properly.",
+      sub: 'How would you like to train?',
+
+      typeQ: 'Pick a routine type',
+      types: {
+        single: 'Today\'s routine',
+        weekly: 'Weekly plan',
+      },
+      typeHint: {
+        single: 'One workout for right now.',
+        weekly: 'A 2–6 day split for the whole week.',
+      },
+
+      // Single-day builder
+      singleTitle: 'Today\'s routine',
+      muscleQ: 'Target muscle group',
+      countQ: 'Number of exercises',
+      timeQ: 'Time available',
+      reviewTitle: 'Ready to generate',
+
+      // Weekly builder
+      weeklyTitle: 'Weekly plan',
+      daysQ: 'How many days per week will you train?',
+      daysHint: 'We pick the optimal split for your level and goal.',
+      splitPreview: 'Suggested split',
+
+      profileSummary: 'Your profile',
+      editProfile: 'Edit profile',
+    },
+
+    loading: {
+      analyzing: 'Analyzing your muscles…',
+      filtering: 'Filtering exercises…',
+      avoidingJunk: 'Avoiding junk routines…',
+      balancing: 'Balancing volume across subgroups…',
+      finalizing: 'Building your routine…',
     },
 
     form: {
       goal: 'Goal',
       muscle: 'Muscle group',
-      muscles: 'Muscle groups',
+      muscles: 'Muscles',
       equipment: 'Equipment',
-      equipmentAvailable: 'Available equipment',
-      time: 'Time available',
-      exerciseCount: 'Number of exercises',
+      time: 'Time',
       level: 'Level',
-      condition: 'Physical condition',
-      conditionPlaceholder: 'Pregnancy, knee pain, back pain, shoulder pain, etc. (optional)',
+      condition: 'Conditions',
+      conditionPlaceholder: 'Pregnancy, knee pain, back pain, etc. (optional)',
 
-      goals: {
-        strength: 'Strength',
-        hypertrophy: 'Muscle growth',
-        endurance: 'Endurance',
-        fatloss: 'Fat loss',
-        mobility: 'Mobility',
-        general: 'General fitness',
-      },
-
-      muscles: {
+      muscleOptions: {
         full_body: 'Full body',
         upper: 'Upper body',
         lower: 'Lower body',
         core: 'Core',
         push: 'Push (chest/shoulders/triceps)',
         pull: 'Pull (back/biceps)',
-        legs: 'Complete legs',
+        legs: 'Legs',
         glutes: 'Glutes',
         chest: 'Chest',
         back: 'Back',
-        lats: 'Back (lats)',
+        lats: 'Lats',
         shoulders: 'Shoulders',
         biceps: 'Biceps',
         triceps: 'Triceps',
@@ -113,9 +172,9 @@ export const translations = {
         abdominals: 'Abs',
       },
 
-      equipments: {
+      equipmentOptions: {
         any: 'Any',
-        none: 'Bodyweight',
+        none: 'No equipment',
         dumbbells: 'Dumbbells',
         barbell: 'Barbell',
         bands: 'Bands',
@@ -126,17 +185,10 @@ export const translations = {
         foam_roll: 'Foam roller',
         other: 'Other',
       },
-
-      levels: {
-        beginner: 'Beginner',
-        intermediate: 'Intermediate',
-        advanced: 'Advanced',
-      },
     },
 
     exercise: {
       instructions: 'Instructions',
-      section: 'Section',
       startTimer: 'Start rest',
       timerLabel: 'Rest',
       logSet: 'Log set',
@@ -145,25 +197,40 @@ export const translations = {
       kg: 'kg',
       lb: 'lb',
       watchTutorial: 'Watch tutorial on YouTube',
-      replace: 'Replace this exercise',
+      replace: 'Replace exercise',
       replacing: 'Finding alternative…',
+      replaced: 'Swapped',
+      noAlternative: 'No alternative found with current filters.',
+
+      primaryMuscle: 'Primary',
+      subgroup: 'Subgroup',
+      secondaryMuscles: 'Secondary',
+      level: 'Level',
+      technique: 'Technique',
+
+      techniques: {
+        straight: 'Straight sets',
+        superset: 'Superset',
+        triset: 'Tri-set',
+        dropset: 'Drop set',
+      },
     },
 
     safety: {
       bannerTitle: 'Safety notice',
       bannerBody:
-        'Based on what you described, this routine has been adjusted to lower-impact options. This is not medical clearance. Please consult a qualified professional before exercising.',
-      flagged: 'Flagged for your condition',
-      removed: 'Removed for safety',
-      adjusted: 'Adjusted intensity',
+        'Based on what you described, this routine has been adjusted to lower-impact options. This is not medical clearance — please consult a qualified professional before exercising.',
+      minorWarning: 'You are under 16. Please train under adult supervision.',
+      seniorWarning: 'For people 60+, we suggest consulting your doctor first.',
     },
 
     saved: {
       title: 'Saved routines',
-      empty: 'No saved routines yet. Generate one in Chat and tap Save.',
+      empty: 'No saved routines yet. Build one and tap Save.',
       saveBtn: 'Save routine',
       named: 'Routine name',
       defaultName: 'Routine',
+      weeklyName: 'Weekly plan',
     },
 
     progress: {
@@ -173,8 +240,6 @@ export const translations = {
       addBodyWeight: 'Log body weight',
       recentLogs: 'Recent sets',
       bodyWeightHistory: 'Body weight history',
-      exercise: 'Exercise',
-      date: 'Date',
     },
 
     auth: {
@@ -185,13 +250,30 @@ export const translations = {
       signIn: 'Sign in',
       signUp: 'Create account',
       signOut: 'Sign out',
-      orContinue: 'Or continue without an account',
       signedInAs: 'Signed in as',
       noSupabase:
-        'Supabase is not configured in this build. Sign-in is disabled. Your data is stored locally on this device.',
-      err: {
-        generic: 'Something went wrong. Please try again.',
-      },
+        'Sign-in is disabled in this build. Your data is stored locally on this device.',
+      err: { generic: 'Something went wrong. Please try again.' },
+
+      profile: 'Your profile',
+      resetProfile: 'Reset profile',
+      resetProfileConfirm: 'Reset your profile and answers?',
+    },
+
+    disclaimer: {
+      title: 'Important: This is not medical advice',
+      body:
+        'VIGORIX provides general fitness suggestions for informational purposes only. It is not a substitute for medical advice, diagnosis, or treatment. Always consult a qualified healthcare professional before starting any exercise program — especially if you are pregnant, recovering from injury, or have any medical condition. You are solely responsible for your use of this information.',
+      ack: 'I understand and accept',
+      revisit: 'View disclaimer',
+    },
+
+    weekly: {
+      title: 'Weekly plan',
+      day: 'Day',
+      rest: 'Rest day',
+      generated: 'Your weekly plan',
+      summary: 'Plan summary',
     },
 
     errors: {
@@ -204,7 +286,7 @@ export const translations = {
     tagline: 'Entrenamientos inteligentes. Hechos para tu cuerpo.',
 
     nav: {
-      chat: 'Chat',
+      builder: 'Crear',
       saved: 'Guardadas',
       progress: 'Progreso',
       account: 'Cuenta',
@@ -219,6 +301,9 @@ export const translations = {
       confirm: 'Confirmar',
       close: 'Cerrar',
       back: 'Volver',
+      next: 'Siguiente',
+      done: 'Listo',
+      retry: 'Reintentar',
       loading: 'Cargando…',
       empty: 'Nada por aquí aún.',
       minutes: 'min',
@@ -227,114 +312,160 @@ export const translations = {
       reps: 'reps',
       rest: 'descanso',
       export: 'Exportar PDF',
-      done: 'Listo',
-      next: 'Siguiente',
-      retry: 'Reintentar',
       optional: 'opcional',
-      loadingExercises: 'Cargando base de ejercicios…',
+      continue: 'Continuar',
+      generate: 'Generar rutina',
+      day: 'Día',
+      days: 'Días',
     },
 
     onboarding: {
-      title: 'Bienvenido a VIGORIX',
-      sub: 'Genera rutinas seguras y estructuradas en segundos. Gratis, bilingüe, sin cuenta requerida.',
-      cta: 'Empezar',
+      welcome: 'Bienvenido a VIGORIX',
+      sub: 'Responde 5 preguntas rápidas para armar tu rutina.',
+      step: 'Paso',
+      of: 'de',
+
+      sexQ: '¿Cuál es tu sexo biológico?',
+      sex: {
+        male: 'Masculino',
+        female: 'Femenino',
+        other: 'Prefiero no decir',
+      },
+
+      ageQ: '¿Cuántos años tienes?',
+      agePlaceholder: 'Edad',
+      ageHint: 'Se usa para ajustar la intensidad. Nunca se comparte.',
+      ageError: 'Ingresa una edad válida (10-99).',
+
+      goalQ: '¿Cuál es tu objetivo principal?',
+      goals: {
+        strength: 'Fuerza',
+        hypertrophy: 'Ganar músculo',
+        endurance: 'Resistencia',
+        fatloss: 'Bajar grasa',
+        mobility: 'Movilidad',
+        general: 'Mantenerme en forma',
+      },
+      goalHint: {
+        strength: 'Mucho peso, pocas reps, descansos largos.',
+        hypertrophy: 'Peso medio, 8–12 reps, ~75 s descanso.',
+        endurance: 'Poco peso, muchas reps, descansos cortos.',
+        fatloss: 'Volumen alto, descansos cortos.',
+        mobility: 'Lento, controlado, sin carga pesada.',
+        general: 'Forma física equilibrada.',
+      },
+
+      levelQ: '¿Cuál es tu nivel de entrenamiento?',
+      levels: {
+        beginner: 'Principiante',
+        balanced: 'Equilibrado',
+        advanced: 'Avanzado',
+        gym_rat: 'Gym rat',
+      },
+      levelHint: {
+        beginner: 'Movimientos simples, sin técnicas avanzadas.',
+        balanced: 'Volumen moderado, ejercicios comunes.',
+        advanced: 'Más volumen, intensidad controlada.',
+        gym_rat: 'Bi-series, tri-series, dropsets, máximo estímulo.',
+      },
+
+      equipmentQ: '¿Qué equipo tienes disponible?',
+      equipmentHint: 'Marca todos los que aplican. Solo te sugerimos lo que puedes hacer.',
+
+      conditionQ: '¿Tienes alguna lesión o condición que debamos saber?',
+      conditionPlaceholder: 'Ej.: dolor de rodilla, embarazo, espalda baja. Vacío si nada.',
+      conditionSkip: 'Saltar',
+
+      finish: 'Guardar y continuar',
     },
 
-    disclaimer: {
-      title: 'Importante: esto no es asesoramiento médico',
-      body:
-        'VIGORIX ofrece sugerencias generales de ejercicio con fines informativos. No sustituye el consejo, diagnóstico o tratamiento médico. Consulta siempre a un profesional de la salud cualificado antes de iniciar cualquier programa de ejercicio, especialmente si estás embarazada, en recuperación de una lesión o tienes alguna condición médica. Eres responsable del uso que hagas de esta información.',
-      ack: 'Entiendo y acepto',
-      revisit: 'Ver aviso legal',
-    },
-
-    chat: {
+    builder: {
       title: 'Planifica un entrenamiento',
-      placeholder: 'Ej.: pecho y espalda, 8 ejercicios, mancuernas y barra',
-      hintPrompt: 'O usa el formulario guiado',
-      generate: 'Generar rutina',
-      regenerate: 'Regenerar',
-      thinking: 'Armando tu rutina…',
-      yourRequest: 'Tu solicitud',
-      generated: 'Tu rutina',
-      clear: 'Borrar chat',
-      replaceExercise: 'Cambiar este ejercicio',
-      replacingExercise: 'Buscando alternativa…',
-      noAlternative: 'No encontré una alternativa válida con tus filtros actuales.',
-      noResults:
-        'No encontré ejercicios que coincidan con todos los filtros. Prueba con menos restricciones, más equipo disponible o cambia el grupo muscular.',
-      welcome:
-        '¡Hola! Dime qué rutina quieres y te voy preguntando lo necesario para armarla bien.',
+      sub: '¿Cómo te gustaría entrenar?',
+
+      typeQ: 'Elige el tipo de rutina',
+      types: {
+        single: 'Rutina del día',
+        weekly: 'Plan semanal',
+      },
+      typeHint: {
+        single: 'Un entreno para hoy.',
+        weekly: 'División de 2 a 6 días para toda la semana.',
+      },
+
+      singleTitle: 'Rutina del día',
+      muscleQ: 'Grupo muscular objetivo',
+      countQ: 'Número de ejercicios',
+      timeQ: 'Tiempo disponible',
+      reviewTitle: 'Listo para generar',
+
+      weeklyTitle: 'Plan semanal',
+      daysQ: '¿Cuántos días por semana entrenarás?',
+      daysHint: 'Elegimos la mejor división según tu nivel y objetivo.',
+      splitPreview: 'División sugerida',
+
+      profileSummary: 'Tu perfil',
+      editProfile: 'Editar perfil',
+    },
+
+    loading: {
+      analyzing: 'Analizando tus músculos…',
+      filtering: 'Filtrando ejercicios…',
+      avoidingJunk: 'Evitando rutinas basura…',
+      balancing: 'Balanceando volumen entre subgrupos…',
+      finalizing: 'Armando tu rutina…',
     },
 
     form: {
       goal: 'Objetivo',
       muscle: 'Grupo muscular',
-      muscles: 'Grupos musculares',
+      muscles: 'Músculos',
       equipment: 'Equipo',
-      equipmentAvailable: 'Equipo disponible',
-      time: 'Tiempo disponible',
-      exerciseCount: 'Número de ejercicios',
+      time: 'Tiempo',
       level: 'Nivel',
-      condition: 'Condición física',
-      conditionPlaceholder: 'Embarazo, dolor de rodilla, espalda, hombro, etc. (opcional)',
+      condition: 'Condiciones',
+      conditionPlaceholder: 'Embarazo, dolor de rodilla, espalda, etc. (opcional)',
 
-      goals: {
-        strength: 'Fuerza',
-        hypertrophy: 'Hipertrofia',
-        endurance: 'Resistencia',
-        fatloss: 'Pérdida de grasa',
-        mobility: 'Movilidad',
-        general: 'Forma general',
-      },
-
-      muscles: {
+      muscleOptions: {
         full_body: 'Cuerpo completo',
         upper: 'Tren superior',
         lower: 'Tren inferior',
         core: 'Core',
         push: 'Empuje (pecho/hombros/tríceps)',
         pull: 'Tirón (espalda/bíceps)',
-        legs: 'Pierna completa',
+        legs: 'Piernas',
         glutes: 'Glúteos',
         chest: 'Pecho',
         back: 'Espalda',
-        lats: 'Espalda (dorsales)',
+        lats: 'Dorsales',
         shoulders: 'Hombros',
         biceps: 'Bíceps',
         triceps: 'Tríceps',
         traps: 'Trapecio',
         forearms: 'Antebrazos',
         quadriceps: 'Cuádriceps',
-        hamstrings: 'Femoral / isquios',
+        hamstrings: 'Isquios',
         calves: 'Pantorrillas',
         abdominals: 'Abdominales',
       },
 
-      equipments: {
+      equipmentOptions: {
         any: 'Cualquiera',
-        none: 'Peso corporal',
+        none: 'Sin equipo',
         dumbbells: 'Mancuernas',
         barbell: 'Barra',
         bands: 'Bandas',
-        machines: 'Máquinas / polea',
-        kettlebell: 'Pesa rusa',
+        machines: 'Máquinas / Polea',
+        kettlebell: 'Kettlebell',
         medicine_ball: 'Balón medicinal',
         exercise_ball: 'Pelota de ejercicio',
         foam_roll: 'Foam roller',
         other: 'Otro',
       },
-
-      levels: {
-        beginner: 'Principiante',
-        intermediate: 'Intermedio',
-        advanced: 'Avanzado',
-      },
     },
 
     exercise: {
       instructions: 'Instrucciones',
-      section: 'Sección',
       startTimer: 'Iniciar descanso',
       timerLabel: 'Descanso',
       logSet: 'Registrar serie',
@@ -343,25 +474,40 @@ export const translations = {
       kg: 'kg',
       lb: 'lb',
       watchTutorial: 'Ver tutorial en YouTube',
-      replace: 'Cambiar este ejercicio',
+      replace: 'Sustituir ejercicio',
       replacing: 'Buscando alternativa…',
+      replaced: 'Sustituido',
+      noAlternative: 'No hay alternativa con los filtros actuales.',
+
+      primaryMuscle: 'Principal',
+      subgroup: 'Subgrupo',
+      secondaryMuscles: 'Secundarios',
+      level: 'Nivel',
+      technique: 'Técnica',
+
+      techniques: {
+        straight: 'Series rectas',
+        superset: 'Bi-serie',
+        triset: 'Tri-serie',
+        dropset: 'Drop set',
+      },
     },
 
     safety: {
       bannerTitle: 'Aviso de seguridad',
       bannerBody:
-        'Según lo que describiste, esta rutina se ajustó a opciones de menor impacto. Esto no constituye autorización médica. Consulta a un profesional cualificado antes de entrenar.',
-      flagged: 'Marcado por tu condición',
-      removed: 'Eliminado por seguridad',
-      adjusted: 'Intensidad ajustada',
+        'Según lo que describiste, esta rutina se ajustó a opciones de menor impacto. Esto no constituye autorización médica — consulta a un profesional cualificado antes de entrenar.',
+      minorWarning: 'Eres menor de 16 años. Entrena bajo supervisión adulta.',
+      seniorWarning: 'Para mayores de 60 años, consulta a tu médico antes de empezar.',
     },
 
     saved: {
       title: 'Rutinas guardadas',
-      empty: 'No tienes rutinas guardadas. Genera una en el Chat y toca Guardar.',
+      empty: 'No tienes rutinas guardadas. Genera una y toca Guardar.',
       saveBtn: 'Guardar rutina',
       named: 'Nombre de la rutina',
       defaultName: 'Rutina',
+      weeklyName: 'Plan semanal',
     },
 
     progress: {
@@ -371,25 +517,40 @@ export const translations = {
       addBodyWeight: 'Registrar peso corporal',
       recentLogs: 'Series recientes',
       bodyWeightHistory: 'Historial de peso corporal',
-      exercise: 'Ejercicio',
-      date: 'Fecha',
     },
 
     auth: {
       title: 'Cuenta',
-      sub: 'Inicia sesión para sincronizar rutinas entre dispositivos. Opcional: la app funciona sin cuenta.',
+      sub: 'Inicia sesión para sincronizar rutinas entre dispositivos. Opcional — la app funciona sin cuenta.',
       email: 'Correo',
       password: 'Contraseña',
       signIn: 'Iniciar sesión',
       signUp: 'Crear cuenta',
       signOut: 'Cerrar sesión',
-      orContinue: 'O continúa sin cuenta',
       signedInAs: 'Sesión iniciada como',
       noSupabase:
-        'Supabase no está configurado en esta versión. El inicio de sesión está desactivado. Tus datos se guardan localmente en este dispositivo.',
-      err: {
-        generic: 'Algo salió mal. Inténtalo de nuevo.',
-      },
+        'El inicio de sesión está desactivado en esta versión. Tus datos se guardan localmente en este dispositivo.',
+      err: { generic: 'Algo salió mal. Inténtalo de nuevo.' },
+
+      profile: 'Tu perfil',
+      resetProfile: 'Reiniciar perfil',
+      resetProfileConfirm: '¿Reiniciar tu perfil y respuestas?',
+    },
+
+    disclaimer: {
+      title: 'Importante: esto no es asesoramiento médico',
+      body:
+        'VIGORIX ofrece sugerencias generales de ejercicio con fines informativos. No sustituye el consejo, diagnóstico o tratamiento médico. Consulta siempre a un profesional de la salud cualificado antes de iniciar cualquier programa de ejercicio — especialmente si estás embarazada, en recuperación de una lesión o tienes alguna condición médica. Eres responsable del uso que hagas de esta información.',
+      ack: 'Entiendo y acepto',
+      revisit: 'Ver aviso legal',
+    },
+
+    weekly: {
+      title: 'Plan semanal',
+      day: 'Día',
+      rest: 'Día de descanso',
+      generated: 'Tu plan semanal',
+      summary: 'Resumen del plan',
     },
 
     errors: {
@@ -400,3 +561,53 @@ export const translations = {
 
 export const LANGS = ['en', 'es'];
 export const DEFAULT_LANG = 'en';
+
+// Localized labels for muscle subgroups (used in ExerciseCard).
+// Keys match the SECTION_LABELS in workoutGenerator + raw muscle names.
+export const SUBGROUP_LABELS = {
+  // Chest sections
+  upper_chest: { en: 'Upper chest', es: 'Pecho superior' },
+  middle_chest: { en: 'Middle chest', es: 'Pecho medio' },
+  lower_chest: { en: 'Lower chest', es: 'Pecho inferior' },
+  chest_isolation: { en: 'Chest isolation', es: 'Aislamiento de pecho' },
+
+  // Back
+  lats: { en: 'Lats', es: 'Dorsales' },
+  middle_back: { en: 'Middle back', es: 'Espalda media' },
+  lower_back: { en: 'Lower back', es: 'Espalda baja' },
+  traps: { en: 'Traps', es: 'Trapecio' },
+
+  // Legs
+  quadriceps: { en: 'Quadriceps', es: 'Cuádriceps' },
+  hamstrings: { en: 'Hamstrings', es: 'Femoral' },
+  glutes: { en: 'Glutes', es: 'Glúteos' },
+  calves: { en: 'Calves', es: 'Pantorrilla' },
+  adductors: { en: 'Adductors', es: 'Aductores' },
+  abductors: { en: 'Abductors', es: 'Abductores' },
+
+  // Shoulders
+  front_delts: { en: 'Front delts', es: 'Deltoide frontal' },
+  side_delts: { en: 'Side delts', es: 'Deltoide lateral' },
+  rear_delts: { en: 'Rear delts', es: 'Deltoide posterior' },
+  shoulders: { en: 'Shoulders', es: 'Hombros' },
+
+  // Arms
+  biceps: { en: 'Biceps', es: 'Bíceps' },
+  triceps: { en: 'Triceps', es: 'Tríceps' },
+  forearms: { en: 'Forearms', es: 'Antebrazos' },
+
+  // Other
+  chest: { en: 'Chest', es: 'Pecho' },
+  back: { en: 'Back', es: 'Espalda' },
+  abdominals: { en: 'Abs', es: 'Abdomen' },
+  core: { en: 'Core', es: 'Core' },
+  neck: { en: 'Neck', es: 'Cuello' },
+  general: { en: 'General', es: 'General' },
+};
+
+export function localizeSubgroup(key, lang = 'en') {
+  if (!key) return null;
+  const entry = SUBGROUP_LABELS[key];
+  if (!entry) return key;
+  return entry[lang] || entry.en || key;
+}
