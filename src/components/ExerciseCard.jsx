@@ -1,102 +1,85 @@
-import { useEffect, useMemo, useState } from 'react';
+// src/components/ExerciseCard.jsx
+//
+// Exercise card. Shows GIF (alternates 2 frames), name, primary muscle,
+// subgroup, secondary muscles, equipment, sets/reps/rest, technique badge,
+// instructions toggle, log-set form, replace button, YouTube link.
+
+import { useEffect, useState } from 'react';
 import { useLanguage } from '../hooks/useLanguage.jsx';
 import { RestTimer } from './RestTimer.jsx';
 import { addLog } from '../services/storageService.js';
 import { youtubeSearchUrl } from '../utils/workoutGenerator.js';
+import { localizeSubgroup } from '../data/translations.js';
 
-function equipmentLabel(equipment, t, lang) {
+function equipmentLabel(equipment, t) {
   const key = equipment || 'none';
-
-  if (key === 'none') return lang === 'es' ? 'Peso corporal' : 'Bodyweight';
-
-  return t.form?.equipments?.[key] || key;
+  return t.form?.equipmentOptions?.[key] || (key === 'none' ? '—' : key);
 }
 
-function translateStepToSpanish(step) {
-  if (!step) return step;
-
-  let s = step;
-
-  const replacements = [
-    [/Lie down/gi, 'Acuéstate'],
-    [/Lie on your back/gi, 'Acuéstate boca arriba'],
-    [/Lie face down/gi, 'Acuéstate boca abajo'],
-    [/Stand straight/gi, 'Párate derecho'],
-    [/Stand tall/gi, 'Párate erguido'],
-    [/Keep your back straight/gi, 'Mantén la espalda recta'],
-    [/Keep your core braced/gi, 'Mantén el core firme'],
-    [/Keep your core tight/gi, 'Mantén el abdomen firme'],
-    [/Keep your chest up/gi, 'Mantén el pecho arriba'],
-    [/Lower the weight/gi, 'Baja el peso'],
-    [/Press the weight/gi, 'Empuja el peso'],
-    [/Return to the starting position/gi, 'Regresa a la posición inicial'],
-    [/Repeat for the recommended amount of repetitions/gi, 'Repite por el número recomendado de repeticiones'],
-    [/Hold/gi, 'Mantén'],
-    [/Slowly/gi, 'Lentamente'],
-    [/Pause/gi, 'Haz una pausa'],
-    [/Squeeze/gi, 'Aprieta'],
-    [/your chest/gi, 'tu pecho'],
-    [/your shoulders/gi, 'tus hombros'],
-    [/your back/gi, 'tu espalda'],
-    [/your knees/gi, 'tus rodillas'],
-    [/your hips/gi, 'tu cadera'],
-    [/your elbows/gi, 'tus codos'],
-    [/the floor/gi, 'el suelo'],
-    [/dumbbells/gi, 'mancuernas'],
-    [/dumbbell/gi, 'mancuerna'],
-    [/barbell/gi, 'barra'],
-    [/cable/gi, 'cable'],
-    [/machine/gi, 'máquina'],
-    [/bench/gi, 'banco'],
-  ];
-
-  for (const [pattern, replacement] of replacements) {
-    s = s.replace(pattern, replacement);
-  }
-
-  return s;
+function localizeMuscleName(name, t, lang) {
+  if (!name) return null;
+  const k = String(name).toLowerCase().replace(/\s+/g, '_');
+  return localizeSubgroup(k, lang) || t.form?.muscleOptions?.[k] || name;
 }
 
-export function ExerciseCard({ exercise, index, onReplace, replacing = false }) {
+export function ExerciseCard({ exercise, index, onReplace }) {
   const { t, lang } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const [showLog, setShowLog] = useState(false);
+  const [replacing, setReplacing] = useState(false);
 
   const name = exercise.name?.[lang] || exercise.name?.en || exercise.id;
-
-  const steps = useMemo(() => {
-    const raw =
-      exercise.instructions?.[lang]?.length
-        ? exercise.instructions[lang]
-        : exercise.instructions?.en || [];
-
-    if (lang !== 'es') return raw;
-
-    return raw.map(translateStepToSpanish);
-  }, [exercise, lang]);
+  const steps = exercise.instructions?.[lang]?.length
+    ? exercise.instructions[lang]
+    : exercise.instructions?.en || [];
 
   const ytUrl = youtubeSearchUrl(exercise.youtubeQuery || exercise.name?.en || name, lang);
-  const sectionLabel = exercise.muscleSection?.label?.[lang] || exercise.muscleSection?.label?.en;
+
+  const primary = exercise.primaryMuscles?.[0];
+  const secondaries = exercise.secondaryMuscles || [];
+  const subgroup = exercise.subgroup;
+
+  const technique = exercise.technique && exercise.technique !== 'straight' ? exercise.technique : null;
+
+  async function handleReplace() {
+    if (!onReplace) return;
+    setReplacing(true);
+    // Brief delay so the user sees something is happening even if the
+    // computation is instant.
+    await new Promise((r) => setTimeout(r, 250));
+    try {
+      onReplace();
+    } finally {
+      setReplacing(false);
+    }
+  }
 
   return (
     <article className="card animate-slide-up overflow-hidden">
-      <ExerciseImage exercise={exercise} alt={name} />
+      <ExerciseImage exercise={exercise} alt={name} index={index} />
 
       <div className="space-y-3 p-4">
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <h3 className="heading-display text-lg leading-tight">{name}</h3>
-
-            {sectionLabel && (
-              <div className="mt-1 rounded-full bg-white/[0.04] px-2 py-1 font-display text-[10px] uppercase tracking-wider text-neon-300">
-                {lang === 'es' ? 'Sección' : 'Section'}: {sectionLabel}
-              </div>
-            )}
-          </div>
-
+          <h3 className="heading-display flex-1 text-lg leading-tight">{name}</h3>
           <span className="shrink-0 rounded-full bg-neon-500/10 px-2 py-1 font-display text-[10px] uppercase tracking-wider text-neon-300">
-            {equipmentLabel(exercise.equipment, t, lang)}
+            {equipmentLabel(exercise.equipment, t)}
           </span>
+        </div>
+
+        {/* Muscle metadata row */}
+        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+          {primary && (
+            <Tag label={localizeMuscleName(primary, t, lang)} kind="primary" />
+          )}
+          {subgroup && subgroup !== primary && (
+            <Tag label={localizeSubgroup(subgroup, lang)} kind="subgroup" />
+          )}
+          {secondaries.slice(0, 2).map((m) => (
+            <Tag key={m} label={localizeMuscleName(m, t, lang)} kind="secondary" />
+          ))}
+          {technique && (
+            <Tag label={t.exercise.techniques?.[technique] || technique} kind="technique" />
+          )}
         </div>
 
         <div className="grid grid-cols-3 gap-2">
@@ -116,40 +99,38 @@ export function ExerciseCard({ exercise, index, onReplace, replacing = false }) 
             {t.exercise.instructions}
             <span className="ml-1 text-neon-400">{expanded ? '▴' : '▾'}</span>
           </button>
-
           <button onClick={() => setShowLog((v) => !v)} className="btn-ghost flex-1 py-2 text-sm">
             {t.exercise.logSet}
           </button>
         </div>
 
-        {onReplace && (
-          <button
-            type="button"
-            onClick={onReplace}
-            disabled={replacing}
-            className="btn-ghost w-full py-2 text-sm disabled:opacity-50"
+        <div className="flex gap-2">
+          {onReplace && (
+            <button
+              onClick={handleReplace}
+              disabled={replacing}
+              className="btn-ghost flex-1 py-2 text-sm disabled:opacity-50"
+            >
+              {replacing ? (
+                <>
+                  <Spinner /> {t.exercise.replacing}
+                </>
+              ) : (
+                <>
+                  <SwapIcon /> {t.exercise.replace}
+                </>
+              )}
+            </button>
+          )}
+          <a
+            href={ytUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-ghost flex-1 py-2 text-sm"
           >
-            {replacing
-              ? lang === 'es'
-                ? 'Buscando alternativa…'
-                : 'Finding alternative…'
-              : lang === 'es'
-                ? 'Cambiar este ejercicio'
-                : 'Replace this exercise'}
-          </button>
-        )}
-
-        <a
-          href={ytUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 rounded-2xl border border-white/5 bg-white/[0.02] py-2 text-sm text-neutral-300 transition hover:bg-white/[0.05]"
-        >
-          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6a3 3 0 0 0-2.1 2.1C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1c.5-1.9.5-5.8.5-5.8s0-3.9-.5-5.8zM9.6 15.6V8.4l6.2 3.6-6.2 3.6z" />
-          </svg>
-          {t.exercise.watchTutorial}
-        </a>
+            <YoutubeIcon /> YouTube
+          </a>
+        </div>
 
         {expanded && steps.length > 0 && (
           <ol className="list-inside list-decimal space-y-1 rounded-2xl bg-white/[0.02] p-3 text-sm leading-relaxed text-neutral-300">
@@ -165,7 +146,7 @@ export function ExerciseCard({ exercise, index, onReplace, replacing = false }) 
   );
 }
 
-function ExerciseImage({ exercise, alt }) {
+function ExerciseImage({ exercise, alt, index }) {
   const images =
     Array.isArray(exercise.images) && exercise.images.length > 0
       ? exercise.images
@@ -178,9 +159,7 @@ function ExerciseImage({ exercise, alt }) {
 
   useEffect(() => {
     if (images.length < 2) return undefined;
-
     const id = setInterval(() => setFrame((f) => (f + 1) % images.length), 700);
-
     return () => clearInterval(id);
   }, [images.length]);
 
@@ -208,6 +187,9 @@ function ExerciseImage({ exercise, alt }) {
           }`}
         />
       ))}
+      <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-ink-950/70 px-2.5 py-1 text-[11px] font-display backdrop-blur-sm">
+        <span className="text-neon-400">#{String((index ?? 0) + 1).padStart(2, '0')}</span>
+      </span>
     </div>
   );
 }
@@ -223,6 +205,24 @@ function Stat({ label, value }) {
   );
 }
 
+function Tag({ label, kind }) {
+  const styles = {
+    primary: 'border-neon-500/40 bg-neon-500/10 text-neon-200',
+    subgroup: 'border-neon-500/20 bg-white/[0.03] text-neon-300/90',
+    secondary: 'border-white/10 bg-white/[0.02] text-neutral-400',
+    technique: 'border-warn-amber/40 bg-warn-amber/10 text-warn-amber',
+  };
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium ${
+        styles[kind] || styles.secondary
+      }`}
+    >
+      {label}
+    </span>
+  );
+}
+
 function SetLogger({ exercise, onLogged }) {
   const { t, lang } = useLanguage();
   const [weight, setWeight] = useState('');
@@ -234,7 +234,6 @@ function SetLogger({ exercise, onLogged }) {
 
   async function submit() {
     setBusy(true);
-
     try {
       await addLog({
         exercise_id: exercise.id,
@@ -244,7 +243,6 @@ function SetLogger({ exercise, onLogged }) {
         reps: reps ? Number(reps) : null,
         notes: notes || null,
       });
-
       setDone(true);
       setTimeout(() => onLogged?.(), 600);
     } catch (e) {
@@ -268,7 +266,6 @@ function SetLogger({ exercise, onLogged }) {
             placeholder="0"
           />
         </div>
-
         <div>
           <label className="label">{t.common.reps}</label>
           <input
@@ -279,7 +276,6 @@ function SetLogger({ exercise, onLogged }) {
             placeholder="0"
           />
         </div>
-
         <div>
           <label className="label">&nbsp;</label>
           <select
@@ -292,7 +288,6 @@ function SetLogger({ exercise, onLogged }) {
           </select>
         </div>
       </div>
-
       <div className="mt-2">
         <label className="label">{t.exercise.notes}</label>
         <input
@@ -302,10 +297,49 @@ function SetLogger({ exercise, onLogged }) {
           placeholder=""
         />
       </div>
-
-      <button onClick={submit} disabled={busy || done} className="btn-primary mt-3 w-full py-2 text-sm">
+      <button
+        onClick={submit}
+        disabled={busy || done}
+        className="btn-primary mt-3 w-full py-2 text-sm"
+      >
         {done ? `✓ ${t.common.saved}` : busy ? t.common.loading : t.common.save}
       </button>
     </div>
+  );
+}
+
+function Spinner() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-3.5 w-3.5 animate-spin"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <path d="M21 12a9 9 0 1 1-6.2-8.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SwapIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-3.5 w-3.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <path d="M7 16H4l3-3m13-1h-3l3 3M4 13h16M4 11h16" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function YoutubeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor" aria-hidden>
+      <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6a3 3 0 0 0-2.1 2.1C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1c.5-1.9.5-5.8.5-5.8s0-3.9-.5-5.8zM9.6 15.6V8.4l6.2 3.6-6.2 3.6z" />
+    </svg>
   );
 }

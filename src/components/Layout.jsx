@@ -1,10 +1,11 @@
+// src/components/Layout.jsx
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../hooks/useLanguage.jsx';
 import { LanguageToggle } from './LanguageToggle.jsx';
 import { useDisclaimer } from '../hooks/useDisclaimer.jsx';
 
 const NAV_ITEMS = [
-  { to: '/', key: 'chat', icon: ChatIcon },
+  { to: '/builder', key: 'builder', icon: BuilderIcon },
   { to: '/saved', key: 'saved', icon: BookmarkIcon },
   { to: '/progress', key: 'progress', icon: ChartIcon },
   { to: '/account', key: 'account', icon: UserIcon },
@@ -16,9 +17,9 @@ export function Layout() {
   const loc = useLocation();
   const navigate = useNavigate();
 
-  function resetChatFromLogo() {
-    navigate('/');
-    window.dispatchEvent(new Event('vigorix:reset-chat'));
+  function handleLogo() {
+    navigate('/builder');
+    window.dispatchEvent(new Event('vigorix:reset-builder'));
   }
 
   return (
@@ -26,9 +27,9 @@ export function Layout() {
       <header className="safe-top sticky top-0 z-30 flex items-center justify-between border-b border-white/5 bg-ink-950/80 px-5 py-3 backdrop-blur-md">
         <button
           type="button"
-          onClick={resetChatFromLogo}
+          onClick={handleLogo}
           className="flex items-center gap-2"
-          aria-label="Reset chat"
+          aria-label="Reset builder"
         >
           <Logo />
           <span className="font-display text-lg font-semibold tracking-tight">
@@ -45,7 +46,6 @@ export function Layout() {
           >
             i
           </button>
-
           <LanguageToggle />
         </div>
       </header>
@@ -58,12 +58,10 @@ export function Layout() {
         <div className="flex items-center justify-around rounded-3xl border border-white/10 bg-ink-900/85 px-2 py-1.5 shadow-2xl backdrop-blur-xl">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
-
             return (
               <NavLink
                 key={item.to}
                 to={item.to}
-                end={item.to === '/'}
                 className={({ isActive }) =>
                   `relative flex min-w-[64px] flex-col items-center gap-1 rounded-2xl px-3 py-2 font-display text-[10px] uppercase tracking-wider transition-all ${
                     isActive
@@ -96,10 +94,10 @@ function Logo() {
   );
 }
 
-function ChatIcon({ className }) {
+function BuilderIcon({ className }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M21 12a8 8 0 0 1-11.5 7.2L4 20l.9-4.6A8 8 0 1 1 21 12z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 8h2v8H5V8zm12 0h2v8h-2V8zM8 11h8v2H8v-2z" fill="currentColor" stroke="none" />
     </svg>
   );
 }
