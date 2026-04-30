@@ -1,24 +1,29 @@
+// src/utils/workoutGenerator.js
+//
+// Rule-based workout generator. Inputs: structured request + exercise pool
+// + detected condition keys. Output: a routine the UI can render.
+//
+// Public API:
+//   generateRoutine(request, exercises, conditionKeys)
+//   generateWeeklyRoutine(request, exercises, conditionKeys)
+//   replaceExercise(routine, exerciseIndex, exercises, conditionKeys)
+//   buildSplit(daysPerWeek, level, goal)         <- returns array of day objects
+//   inferSubgroup(exercise, targetMuscle)
+//   subgroupOf(exercise)
+//   youtubeSearchUrl(name, lang)
+
 import { getAvoidTags, getIntensityModifier } from '../data/conditions.js';
 
-const MIN_EXERCISES = 3;
-const MAX_EXERCISES = 12;
+// =================================================================
+// TAXONOMY
+// =================================================================
 
-const DEFAULT_REQUEST = {
-  goal: 'general',
-  muscles: [],
-  muscle: null,
-  muscleStatus: null,
-  equipment: ['any'],
-  time: null,
-  level: null,
-  condition: '',
-  conditionStatus: null,
-  exerciseCount: null,
-};
-
-const MUSCLE_PRIMARY = {
+// User-facing muscle keys → which raw muscles (from the dataset's
+// primaryMuscles field) count as a hit. Used both for matching and
+// for grouping in weekly splits.
+export const MUSCLE_PRIMARY = {
   chest: ['chest'],
-  back: ['lats', 'middle back', 'lower back', 'traps'],
+  back: ['lats', 'middle back', 'lower back'],
   lats: ['lats'],
   biceps: ['biceps'],
   triceps: ['triceps'],
@@ -29,6 +34,8 @@ const MUSCLE_PRIMARY = {
   hamstrings: ['hamstrings'],
   calves: ['calves'],
   glutes: ['glutes'],
+  abductors: ['abductors'],
+  adductors: ['adductors'],
   core: ['abdominals'],
   abdominals: ['abdominals'],
   legs: ['quadriceps', 'hamstrings', 'calves', 'glutes', 'adductors', 'abductors'],
@@ -36,9 +43,10 @@ const MUSCLE_PRIMARY = {
   upper: ['chest', 'shoulders', 'triceps', 'biceps', 'lats', 'middle back', 'lower back', 'traps'],
   push: ['chest', 'shoulders', 'triceps'],
   pull: ['lats', 'middle back', 'lower back', 'traps', 'biceps', 'forearms'],
-  full_body: null,
+  full_body: null, // null = match anything
 };
 
+// When the user picks a "group" muscle, expand it for distribution.
 const GROUP_EXPANSIONS = {
   full_body: ['chest', 'back', 'quadriceps', 'hamstrings', 'glutes', 'shoulders', 'core'],
   upper: ['chest', 'back', 'shoulders', 'biceps', 'triceps'],
@@ -48,6 +56,7 @@ const GROUP_EXPANSIONS = {
   pull: ['back', 'biceps', 'traps'],
 };
 
+// How many exercises to allocate to each muscle within a group.
 const MUSCLE_WEIGHTS = {
   chest: 4,
   back: 4,
@@ -65,51 +74,51 @@ const MUSCLE_WEIGHTS = {
   forearms: 1,
 };
 
+// Subgroup plans — the order in which we try to fill subgroups for variety.
+// "If user wants 4 chest exercises, give them upper, middle, lower, isolation"
 const SECTION_PLANS = {
   chest: ['upper_chest', 'middle_chest', 'lower_chest', 'chest_isolation'],
   back: ['lats', 'middle_back', 'traps', 'lower_back'],
   lats: ['lats', 'middle_back'],
+  shoulders: ['side_delts', 'front_delts', 'rear_delts'],
   quadriceps: ['quadriceps'],
   hamstrings: ['hamstrings'],
   glutes: ['glutes'],
   calves: ['calves'],
-  shoulders: ['front_delts', 'side_delts', 'rear_delts'],
   biceps: ['biceps'],
   triceps: ['triceps'],
   core: ['core'],
+  abdominals: ['core'],
   traps: ['traps'],
   forearms: ['forearms'],
+  legs: ['quadriceps', 'quadriceps', 'quadriceps', 'hamstrings', 'hamstrings', 'hamstrings', 'glutes', 'calves', 'adductors', 'abductors'],
+  lower: ['quadriceps', 'hamstrings', 'glutes', 'calves', 'adductors', 'abductors'],
 };
 
-const SECTION_LABELS = {
-  upper_chest: { en: 'Upper chest', es: 'Pecho superior' },
-  middle_chest: { en: 'Middle chest', es: 'Pecho medio' },
-  lower_chest: { en: 'Lower chest', es: 'Pecho inferior' },
-  chest_isolation: { en: 'Chest isolation', es: 'Aislamiento de pecho' },
+// Heuristic mapping from exercise name fragments → subgroup label.
+const SECTION_NAME_HINTS = [
+  // Chest
+  { re: /\bincline|inclinad/i, group: 'chest', section: 'upper_chest' },
+  { re: /\bdecline|declinad/i, group: 'chest', section: 'lower_chest' },
+  { re: /\bfly|flye|cross|peck|aperturas|cruce/i, group: 'chest', section: 'chest_isolation' },
+  { re: /\bdip\b/i, group: 'chest', section: 'lower_chest' },
 
-  lats: { en: 'Lats', es: 'Dorsales' },
-  middle_back: { en: 'Middle back', es: 'Espalda media' },
-  lower_back: { en: 'Lower back', es: 'Espalda baja' },
-  traps: { en: 'Traps', es: 'Trapecio' },
+  // Back
+  { re: /\bdeadlift|peso muerto|good ?morning|hyperextension|back extension/i, group: 'back', section: 'lower_back' },
+  { re: /\bshrug|encogim|farmer/i, group: 'back', section: 'traps' },
+  { re: /\bpull.?up|chin.?up|pulldown|jal[oó]n|dominada/i, group: 'back', section: 'lats' },
+  { re: /\brow\b|remo/i, group: 'back', section: 'middle_back' },
 
-  quadriceps: { en: 'Quadriceps', es: 'Cuádriceps' },
-  hamstrings: { en: 'Hamstrings', es: 'Femoral / isquios' },
-  glutes: { en: 'Glutes', es: 'Glúteos' },
-  calves: { en: 'Calves', es: 'Pantorrilla' },
+  // Shoulders
+  { re: /\blateral raise|elevac.* lateral/i, group: 'shoulders', section: 'side_delts' },
+  { re: /\bfront raise|elevac.* frontal/i, group: 'shoulders', section: 'front_delts' },
+  { re: /\brear|reverse fly|p[aá]jaros|posterior/i, group: 'shoulders', section: 'rear_delts' },
+  { re: /\bpress|military|overhead/i, group: 'shoulders', section: 'front_delts' },
+];
 
-  front_delts: { en: 'Front delts', es: 'Deltoide frontal' },
-  side_delts: { en: 'Side delts', es: 'Deltoide lateral' },
-  rear_delts: { en: 'Rear delts', es: 'Deltoide posterior' },
-
-  biceps: { en: 'Biceps', es: 'Bíceps' },
-  triceps: { en: 'Triceps', es: 'Tríceps' },
-  core: { en: 'Core', es: 'Core / abdomen' },
-  forearms: { en: 'Forearms', es: 'Antebrazos' },
-  general: { en: 'General', es: 'General' },
-};
-
+// Sets / reps / rest schemes by goal.
 const SCHEMES = {
-  strength: { sets: 4, reps: '4-6', rest: 120 },
+  strength: { sets: 4, reps: '4-6', rest: 150 },
   hypertrophy: { sets: 4, reps: '8-12', rest: 75 },
   endurance: { sets: 3, reps: '15-20', rest: 45 },
   fatloss: { sets: 3, reps: '12-15', rest: 30 },
@@ -117,21 +126,22 @@ const SCHEMES = {
   general: { sets: 3, reps: '10-12', rest: 60 },
 };
 
-const ALL_REAL_EQUIPMENT = [
-  'none',
-  'dumbbells',
-  'barbell',
-  'bands',
-  'kettlebell',
-  'exercise_ball',
-  'medicine_ball',
-  'machines',
-];
+// Level → volume modifier (multiplies set count) and technique availability.
+const LEVEL_PROFILE = {
+  beginner: { setsMul: 0.75, allowSuperset: false, allowDropset: false, capLevel: 'beginner' },
+  balanced: { setsMul: 1.0, allowSuperset: false, allowDropset: false, capLevel: 'intermediate' },
+  advanced: { setsMul: 1.0, allowSuperset: true, allowDropset: false, capLevel: 'expert' },
+  gym_rat: { setsMul: 1.15, allowSuperset: true, allowDropset: true, capLevel: 'expert' },
+};
 
-function clampExerciseCount(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return null;
-  return Math.max(MIN_EXERCISES, Math.min(MAX_EXERCISES, Math.round(n)));
+const LEVEL_ORDER = { beginner: 1, intermediate: 2, expert: 3, advanced: 3 };
+
+// =================================================================
+// HELPERS
+// =================================================================
+
+function unique(arr) {
+  return Array.from(new Set((arr || []).filter(Boolean)));
 }
 
 function exerciseCountForTime(minutes) {
@@ -146,718 +156,600 @@ function exerciseCountForTime(minutes) {
 
 function adjustReps(repsStr, modifier) {
   if (modifier >= 1) return repsStr;
-
-  const m = repsStr.match(/^(\d+)-(\d+)$/);
+  const m = String(repsStr).match(/^(\d+)-(\d+)$/);
   if (!m) return repsStr;
-
   const lo = Math.max(4, Math.round(parseInt(m[1], 10) * modifier));
   const hi = Math.max(lo + 2, Math.round(parseInt(m[2], 10) * modifier));
-
   return `${lo}-${hi}`;
 }
 
-function unique(arr) {
-  return Array.from(new Set((arr || []).filter(Boolean)));
+function shuffleInPlace(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
 }
 
-function normalizeMuscles(input) {
-  const raw = Array.isArray(input) ? input : input ? [input] : [];
-  const cleaned = raw.filter(Boolean);
+// =================================================================
+// SUBGROUP DETECTION
+// =================================================================
 
-  if (cleaned.length === 0) return ['full_body'];
+/**
+ * Infer the subgroup of an exercise relative to a target muscle.
+ * Returns a key like 'upper_chest', 'lats', 'side_delts'.
+ */
+export function inferSubgroup(ex, targetMuscle) {
+  if (!ex) return 'general';
 
-  const expanded = [];
+  const name = (ex.name?.en || ex.name || '').toLowerCase();
 
-  for (const item of cleaned) {
-    const key = item === 'abdominals' ? 'core' : item;
-    const group = GROUP_EXPANSIONS[key];
-
-    if (group) expanded.push(...group);
-    else expanded.push(key);
+  // Try the name hints first — most reliable.
+  for (const hint of SECTION_NAME_HINTS) {
+    if (hint.re.test(name)) {
+      // Only return if it matches the target group (or the target is generic)
+      if (
+        !targetMuscle ||
+        targetMuscle === 'full_body' ||
+        targetMuscle === hint.group ||
+        (MUSCLE_PRIMARY[targetMuscle] || []).some((m) => MUSCLE_PRIMARY[hint.group]?.includes(m))
+      ) {
+        return hint.section;
+      }
+    }
   }
 
-  const result = unique(expanded);
+  // Fall back to the primary muscle of the exercise.
+  const primary = (ex.primaryMuscles && ex.primaryMuscles[0]) || ex.muscle?.[0];
+  if (primary) return String(primary).replace(/\s+/g, '_');
 
-  if (result.length === 0) return ['full_body'];
-  if (result.includes('full_body')) return GROUP_EXPANSIONS.full_body;
-
-  return result;
+  return 'general';
 }
 
-function normalizeEquipment(input) {
-  const raw = Array.isArray(input) ? input : input ? [input] : ['any'];
-  const cleaned = unique(raw);
-
-  if (cleaned.length === 0) return ['any'];
-  if (cleaned.includes('any')) return ['any'];
-
-  return cleaned;
+/**
+ * Public: subgroup tag without needing a target.
+ */
+export function subgroupOf(exercise) {
+  return inferSubgroup(exercise, null);
 }
 
-export function normalizeRequest(request = {}) {
-  const rawTime = request.time === '' || request.time === undefined ? null : request.time;
-  const parsedTime = rawTime === null ? null : Number(rawTime);
-  const safeTime = Number.isFinite(parsedTime)
-    ? Math.max(5, Math.min(180, Math.round(parsedTime)))
-    : null;
+// =================================================================
+// MATCHING & SCORING
+// =================================================================
 
-  const hasExplicitMuscleIntent =
-    request.muscleStatus === 'selected' ||
-    (Array.isArray(request.muscles) && request.muscles.length > 0) ||
-    (request.muscle && request.muscle !== 'full_body');
-
-  const muscles = normalizeMuscles(request.muscles || request.muscle);
-  const equipment = normalizeEquipment(request.equipment);
-
-  return {
-    ...DEFAULT_REQUEST,
-    ...request,
-    muscles,
-    muscle: muscles[0] || 'full_body',
-    muscleStatus: hasExplicitMuscleIntent ? 'selected' : request.muscleStatus || null,
-    equipment,
-    time: safeTime,
-    level: request.level || null,
-    condition: request.condition || '',
-    conditionStatus: request.conditionStatus || null,
-    exerciseCount: clampExerciseCount(request.exerciseCount),
-  };
+function muscleMatchesPrimary(ex, requestedMuscle) {
+  if (!requestedMuscle || requestedMuscle === 'full_body') return true;
+  const primary = MUSCLE_PRIMARY[requestedMuscle];
+  if (!primary) {
+    // Unknown — fall back to tag membership
+    return (ex.muscle || []).includes(requestedMuscle);
+  }
+  const exPrimary = ex.primaryMuscles || [];
+  return exPrimary.some((m) => primary.includes(m));
 }
 
 function equipmentMatches(ex, requestedEquipment) {
-  const eq = normalizeEquipment(requestedEquipment);
-  if (eq.includes('any')) return true;
-  return eq.includes(ex.equipment);
+  if (!requestedEquipment || requestedEquipment.length === 0) return true;
+  if (requestedEquipment.includes('any')) return true;
+  if (requestedEquipment.includes(ex.equipment)) return true;
+  // Bodyweight is always available unless 'none' was explicitly excluded
+  if (ex.equipment === 'none' && requestedEquipment.length > 0) return true;
+  return false;
 }
 
-function primaryMuscleMatches(ex, requestedMuscle) {
-  if (!requestedMuscle || requestedMuscle === 'full_body') return true;
-
-  const allowed = MUSCLE_PRIMARY[requestedMuscle];
-
-  if (!allowed) return true;
-
-  const primary = ex.primaryMuscles || [];
-
-  return primary.some((m) => allowed.includes(m));
+function levelOk(ex, capLevel) {
+  if (!capLevel) return true;
+  const exLvl = LEVEL_ORDER[ex.level] || 2;
+  const capLvl = LEVEL_ORDER[capLevel] || 2;
+  return exLvl <= capLvl;
 }
 
-function matchesAnyRequestedMuscle(ex, req) {
-  return req.muscles.some((m) => primaryMuscleMatches(ex, m));
+function passesSafety(ex, avoidTags) {
+  if (!avoidTags || avoidTags.size === 0) return true;
+  return !ex.tags?.some((t) => avoidTags.has(t));
 }
 
-function normalizeExerciseKey(value) {
-  return String(value || '')
-    .toLowerCase()
-    .replace(/\b(with|the|and|or|de|con|sin|a|an|one|two|arm|single|double)\b/g, '')
-    .replace(/\b(barbell|dumbbell|cable|machine|smith|band|bands|bodyweight|incline|decline|flat)\b/g, '')
-    .replace(/[^a-z0-9]/g, '');
-}
+/**
+ * Score an exercise's fit. Returns null if it should be excluded.
+ */
+function scoreExercise(ex, ctx) {
+  if (!passesSafety(ex, ctx.avoidTags)) return null;
+  if (!levelOk(ex, ctx.capLevel)) return null;
+  if (!equipmentMatches(ex, ctx.equipment)) return null;
+  if (!muscleMatchesPrimary(ex, ctx.targetMuscle)) return null;
 
-function exerciseKey(ex) {
-  return normalizeExerciseKey(ex.id || ex.name?.en || ex.name?.es);
-}
+  let s = 10;
 
-function isDuplicateExercise(ex, chosen) {
-  const key = exerciseKey(ex);
-  const id = String(ex.id || '').toLowerCase();
+  // Equipment exact match (not bodyweight default) gets a small bonus.
+  if (ctx.equipment.includes(ex.equipment) && ex.equipment !== 'none') s += 4;
 
-  return chosen.some((c) => {
-    const cKey = exerciseKey(c);
-    const cId = String(c.id || '').toLowerCase();
+  // Level closeness (we want the user's level, not below)
+  const exLvl = LEVEL_ORDER[ex.level] || 2;
+  const want = ctx.userLevelOrder;
+  if (exLvl === want) s += 5;
+  else if (Math.abs(exLvl - want) === 1) s += 2;
 
-    if (id && cId && id === cId) return true;
-    if (!key || !cKey) return false;
-    if (key === cKey) return true;
+  // Goal-aligned mechanics
+  if (ctx.goal === 'strength' && ex.mechanic === 'compound') s += 4;
+  if (ctx.goal === 'hypertrophy' && (ex.mechanic === 'compound' || ex.mechanic === 'isolation')) s += 2;
+  if (ctx.goal === 'mobility' && ex.category === 'stretching') s += 6;
 
-    if (key.length >= 8 && cKey.length >= 8) {
-      return key.includes(cKey) || cKey.includes(key);
-    }
-
-    return false;
-  });
-}
-
-function isValidExerciseForRequest(ex, req, avoidTags, targetMuscle = null) {
-  if (ex.tags?.some((t) => avoidTags.has(t))) return false;
-  if (!equipmentMatches(ex, req.equipment)) return false;
-
-  if (targetMuscle) {
-    if (!primaryMuscleMatches(ex, targetMuscle)) return false;
-  } else if (!matchesAnyRequestedMuscle(ex, req)) {
-    return false;
+  // Subgroup match bonus
+  if (ctx.preferredSubgroup) {
+    const sub = inferSubgroup(ex, ctx.targetMuscle);
+    if (sub === ctx.preferredSubgroup) s += 8;
   }
 
-  if (req.goal !== 'mobility' && ex.category === 'stretching') return false;
+  // Slight randomization so successive generations aren't identical.
+  s += Math.random() * 0.5;
 
-  return true;
+  return s;
 }
 
-function inferMuscleSection(ex, targetMuscle) {
-  const name = `${ex.id || ''} ${ex.name?.en || ''}`.toLowerCase();
-  const primary = ex.primaryMuscles || [];
+// =================================================================
+// REQUEST NORMALIZATION
+// =================================================================
 
-  let key = 'general';
-
-  if (targetMuscle === 'chest') {
-    if (/incline|upper/.test(name)) key = 'upper_chest';
-    else if (/decline|dip|lower/.test(name)) key = 'lower_chest';
-    else if (/fly|flies|crossover|cross over|pec deck/.test(name)) key = 'chest_isolation';
-    else key = 'middle_chest';
-  } else if (targetMuscle === 'back' || targetMuscle === 'lats') {
-    if (/lat|pulldown|pullup|pull-up|chin/.test(name) || primary.includes('lats')) key = 'lats';
-    else if (/row/.test(name) || primary.includes('middle back')) key = 'middle_back';
-    else if (/shrug|trap/.test(name) || primary.includes('traps')) key = 'traps';
-    else if (/deadlift|hyperextension|good morning|lower/.test(name) || primary.includes('lower back')) key = 'lower_back';
-    else key = 'middle_back';
-  } else if (targetMuscle === 'quadriceps') key = 'quadriceps';
-  else if (targetMuscle === 'hamstrings') key = 'hamstrings';
-  else if (targetMuscle === 'glutes') key = 'glutes';
-  else if (targetMuscle === 'calves') key = 'calves';
-  else if (targetMuscle === 'biceps') key = 'biceps';
-  else if (targetMuscle === 'triceps') key = 'triceps';
-  else if (targetMuscle === 'traps') key = 'traps';
-  else if (targetMuscle === 'forearms') key = 'forearms';
-  else if (targetMuscle === 'core' || targetMuscle === 'abdominals') key = 'core';
-  else if (targetMuscle === 'shoulders') {
-    if (/rear|reverse|face pull/.test(name)) key = 'rear_delts';
-    else if (/side|lateral/.test(name)) key = 'side_delts';
-    else key = 'front_delts';
-  }
-
-  return {
-    key,
-    label: SECTION_LABELS[key] || SECTION_LABELS.general,
+export function normalizeRequest(request = {}) {
+  const r = {
+    goal: request.goal || 'general',
+    level: request.level || 'balanced',
+    muscle: request.muscle || 'full_body',
+    equipment: Array.isArray(request.equipment)
+      ? unique(request.equipment)
+      : request.equipment
+        ? [request.equipment]
+        : ['any'],
+    time: request.time && Number(request.time) > 0 ? Number(request.time) : null,
+    exerciseCount:
+      request.exerciseCount && Number(request.exerciseCount) > 0
+        ? Math.max(3, Math.min(12, Math.round(Number(request.exerciseCount))))
+        : null,
+    condition: request.condition || '',
+    sex: request.sex || null,
+    age: request.age ? Number(request.age) : null,
   };
+
+  if (r.equipment.length === 0) r.equipment = ['any'];
+
+  // Resolve target count: explicit count beats time-derived.
+  if (!r.exerciseCount && r.time) {
+    r.exerciseCount = exerciseCountForTime(r.time);
+  }
+  if (!r.exerciseCount) r.exerciseCount = 5;
+
+  return r;
 }
 
-function scoreExercise(ex, req, avoidTags, targetMuscle = null, preferredSection = null) {
-  if (!isValidExerciseForRequest(ex, req, avoidTags, targetMuscle)) return null;
-
-  let score = 0;
-
-  if (targetMuscle) {
-    score += 30;
-    if (primaryMuscleMatches(ex, targetMuscle)) score += 20;
-  }
-
-  if (req.level) {
-    const order = { beginner: 1, intermediate: 2, advanced: 3 };
-    const exLvl = order[ex.level] || 2;
-    const reqLvl = order[req.level] || 2;
-
-    if (exLvl === reqLvl) score += 4;
-    else if (exLvl < reqLvl) score += 2;
-    else score -= 3;
-  }
-
-  if (equipmentMatches(ex, req.equipment)) score += 4;
-
-  const section = inferMuscleSection(ex, targetMuscle).key;
-
-  if (preferredSection && section === preferredSection) score += 18;
-
-  score += Math.random() * 0.5;
-
-  return score;
-}
+// =================================================================
+// MUSCLE ALLOCATION (how many exercises per muscle for a group target)
+// =================================================================
 
 function allocateCounts(muscles, total) {
-  const targets = unique(muscles);
+  if (muscles.length === 1) return { [muscles[0]]: total };
 
-  if (targets.length === 0) return [];
-  if (targets.length === 1) return [{ muscle: targets[0], count: total }];
+  const weights = muscles.map((m) => MUSCLE_WEIGHTS[m] || 1);
+  const sum = weights.reduce((a, b) => a + b, 0);
+  const allocation = {};
+  let assigned = 0;
 
-  const sorted = targets
-    .map((muscle) => ({ muscle, weight: MUSCLE_WEIGHTS[muscle] || 2 }))
-    .sort((a, b) => b.weight - a.weight);
-
-  const totalWeight = sorted.reduce((s, m) => s + m.weight, 0);
-  let remaining = total;
-
-  const allocations = sorted.map((item) => {
-    const exact = (item.weight / totalWeight) * total;
-    const base = Math.max(1, Math.floor(exact));
-    remaining -= base;
-
-    return {
-      muscle: item.muscle,
-      count: base,
-      fraction: exact - Math.floor(exact),
-      weight: item.weight,
-    };
-  });
-
-  while (remaining > 0) {
-    allocations.sort((a, b) => b.fraction - a.fraction || b.weight - a.weight);
-    allocations[0].count += 1;
-    allocations[0].fraction = 0;
-    remaining -= 1;
+  for (let i = 0; i < muscles.length; i++) {
+    const share = Math.floor((weights[i] / sum) * total);
+    allocation[muscles[i]] = share;
+    assigned += share;
   }
 
-  while (allocations.reduce((s, a) => s + a.count, 0) > total) {
-    const removable = allocations
-      .filter((a) => a.count > 1)
-      .sort((a, b) => a.weight - b.weight)[0];
-
-    if (!removable) break;
-
-    removable.count -= 1;
+  // Distribute remainder largest-weight-first.
+  const ordered = muscles
+    .map((m, i) => ({ m, w: weights[i] }))
+    .sort((a, b) => b.w - a.w);
+  let i = 0;
+  while (assigned < total && i < ordered.length * 2) {
+    allocation[ordered[i % ordered.length].m] += 1;
+    assigned++;
+    i++;
   }
 
-  return allocations.map(({ muscle, count }) => ({ muscle, count }));
+  return allocation;
 }
 
-function sectionSequenceFor(muscle, count) {
-  const plan = SECTION_PLANS[muscle] || [muscle];
-  const sequence = [];
-
-  for (let i = 0; i < count; i++) {
-    sequence.push(plan[i % plan.length]);
-  }
-
-  return sequence;
+function expandTargetMuscles(muscle) {
+  if (GROUP_EXPANSIONS[muscle]) return GROUP_EXPANSIONS[muscle];
+  return [muscle];
 }
 
-function chooseBestExercise(scored, req, avoidTags, chosen, targetMuscle, preferredSection) {
-  const ranked = scored
-    .map(({ ex }) => ({
-      ex,
-      score: scoreExercise(ex, req, avoidTags, targetMuscle, preferredSection),
-    }))
-    .filter((item) => item.score !== null && !isDuplicateExercise(item.ex, chosen))
+// =================================================================
+// CORE GENERATION
+// =================================================================
+
+function pickForMuscle(pool, muscle, count, ctx, alreadyChosen) {
+  const sectionPlan = SECTION_PLANS[muscle] || [muscle];
+  const chosen = [];
+  const usedSubgroups = new Set();
+
+  // Score the whole pool against this muscle once.
+  const scored = pool
+    .map((ex) => {
+      const localCtx = { ...ctx, targetMuscle: muscle, preferredSubgroup: null };
+      const s = scoreExercise(ex, localCtx);
+      return s === null ? null : { ex, score: s };
+    })
+    .filter(Boolean)
     .sort((a, b) => b.score - a.score);
 
-  return ranked[0]?.ex || null;
+  if (scored.length === 0) return chosen;
+
+  for (let i = 0; i < count; i++) {
+    // Preferred subgroup for this slot, cycling through the plan.
+    const wanted = sectionPlan[i % sectionPlan.length];
+
+    // First try to find a great match in the wanted subgroup that's also new.
+    let pick = scored.find(
+      ({ ex }) =>
+        !alreadyChosen.has(ex.id) &&
+        !chosen.some((c) => c.id === ex.id) &&
+        inferSubgroup(ex, muscle) === wanted &&
+        !usedSubgroups.has(wanted),
+    );
+
+    // Fall back: any scored exercise we haven't used yet.
+    if (!pick) {
+      pick = scored.find(
+        ({ ex }) =>
+          !alreadyChosen.has(ex.id) &&
+          !chosen.some((c) => c.id === ex.id),
+      );
+    }
+
+    if (!pick) break;
+
+    chosen.push(pick.ex);
+    alreadyChosen.add(pick.ex.id);
+    usedSubgroups.add(inferSubgroup(pick.ex, muscle));
+
+    // After using a subgroup once, allow it again only if there are no fresh ones.
+    // We rebuild the available section each cycle.
+    if (usedSubgroups.size >= sectionPlan.length) {
+      usedSubgroups.clear();
+    }
+  }
+
+  return chosen;
 }
 
-function buildPrescription(ex, req, intensity, targetMuscle, sectionOverride = null) {
-  const scheme = SCHEMES[req.goal] || SCHEMES.general;
-  const section = sectionOverride || inferMuscleSection(ex, targetMuscle);
+function applyTechniques(exercises, levelKey) {
+  const profile = LEVEL_PROFILE[levelKey] || LEVEL_PROFILE.balanced;
+  const out = exercises.map((ex) => ({ ...ex, technique: 'straight' }));
+
+  if (!profile.allowSuperset && !profile.allowDropset) return out;
+
+  // Pair adjacent isolation exercises into a superset (every 3rd-4th slot).
+  // This keeps it simple and safe even on advanced.
+  if (profile.allowSuperset && out.length >= 4) {
+    for (let i = 1; i < out.length; i += 3) {
+      if (i + 1 >= out.length) break;
+      const a = out[i];
+      const b = out[i + 1];
+      // Only superset if both are non-strength (we don't pair heavy compounds).
+      if (a.mechanic !== 'compound' && b.mechanic !== 'compound') {
+        a.technique = 'superset';
+        a.supersetWith = b.id;
+        b.technique = 'superset';
+        b.supersetWith = a.id;
+      }
+    }
+  }
+
+  // Add one drop set on the last big lift for gym rats.
+  if (profile.allowDropset) {
+    const last = out
+      .map((ex, i) => ({ ex, i }))
+      .reverse()
+      .find(({ ex }) => ex.mechanic !== 'compound');
+    if (last) last.ex.technique = 'dropset';
+  }
+
+  return out;
+}
+
+function buildPrescription(exercise, ctx) {
+  const scheme = SCHEMES[ctx.goal] || SCHEMES.general;
+  const profile = LEVEL_PROFILE[ctx.levelKey] || LEVEL_PROFILE.balanced;
+  const sets = Math.max(2, Math.round(scheme.sets * profile.setsMul * (ctx.intensity < 1 ? 0.85 : 1)));
+  const reps = adjustReps(scheme.reps, ctx.intensity);
+  const rest = ctx.intensity < 1 ? Math.round(scheme.rest * 1.15) : scheme.rest;
 
   return {
-    ...ex,
-    targetMuscle,
-    muscleSection: section,
-    sets: Math.max(2, Math.round(scheme.sets * (intensity < 1 ? 0.85 : 1))),
-    reps: adjustReps(scheme.reps, intensity),
-    rest: scheme.rest,
+    ...exercise,
+    sets,
+    reps,
+    rest,
+    subgroup: inferSubgroup(exercise, ctx.targetMuscleForCard || null),
   };
 }
 
-export function generateRoutine(request, exercises, conditionKeys = []) {
-  const req = normalizeRequest(request);
+/**
+ * Generate a single-day routine.
+ */
+export function generateRoutine(rawRequest, exercises, conditionKeys = []) {
+  const request = normalizeRequest(rawRequest);
   const avoidTags = getAvoidTags(conditionKeys);
   const intensity = getIntensityModifier(conditionKeys);
 
-  const pool = exercises.filter((e) =>
-    Array.isArray(e.images) ? e.images.length > 0 : !!e.gif,
+  const profile = LEVEL_PROFILE[request.level] || LEVEL_PROFILE.balanced;
+  const userLevelOrder = LEVEL_ORDER[
+    request.level === 'beginner'
+      ? 'beginner'
+      : request.level === 'gym_rat'
+        ? 'expert'
+        : request.level === 'advanced'
+          ? 'expert'
+          : 'intermediate'
+  ];
+
+  const ctx = {
+    goal: request.goal,
+    levelKey: request.level,
+    capLevel: profile.capLevel,
+    userLevelOrder,
+    equipment: request.equipment,
+    avoidTags,
+    intensity,
+    targetMuscle: request.muscle,
+  };
+
+  const pool = (exercises || []).filter(
+    (e) => Array.isArray(e.images) ? e.images.length > 0 : !!e.gif,
   );
 
-  const baseScored = pool
-    .map((ex) => ({ ex, score: scoreExercise(ex, req, avoidTags) }))
-    .filter((s) => s.score !== null)
-    .sort((a, b) => b.score - a.score);
-
-  if (baseScored.length === 0) {
-    return { exercises: [], conditionKeys, intensity, empty: true, request: req };
+  if (pool.length === 0) {
+    return { exercises: [], conditionKeys, intensity, request, empty: true };
   }
 
-  const desiredCount = req.exerciseCount || exerciseCountForTime(req.time || 30);
-  const targetCount = Math.min(desiredCount, MAX_EXERCISES);
+  // Decide muscle distribution.
+  const targetMuscles = expandTargetMuscles(request.muscle);
+  const allocation = allocateCounts(targetMuscles, request.exerciseCount);
 
-  const allocations = allocateCounts(req.muscles, targetCount);
-  const chosen = [];
+  const alreadyChosen = new Set();
+  const collected = [];
 
-  for (const allocation of allocations) {
-    const sections = sectionSequenceFor(allocation.muscle, allocation.count);
-
-    for (const sectionKey of sections) {
-      let selected = chooseBestExercise(
-        baseScored,
-        req,
-        avoidTags,
-        chosen,
-        allocation.muscle,
-        sectionKey,
-      );
-
-      if (!selected) {
-        selected = chooseBestExercise(baseScored, req, avoidTags, chosen, allocation.muscle, null);
-      }
-
-      if (!selected) continue;
-
-      const section = inferMuscleSection(selected, allocation.muscle);
-
-      chosen.push(buildPrescription(selected, req, intensity, allocation.muscle, section));
+  for (const muscle of targetMuscles) {
+    const need = allocation[muscle];
+    if (!need) continue;
+    const picks = pickForMuscle(pool, muscle, need, ctx, alreadyChosen);
+    for (const ex of picks) {
+      collected.push({ ...ex, _targetMuscle: muscle });
     }
   }
 
-  if (chosen.length === 0) {
-    return { exercises: [], conditionKeys, intensity, empty: true, request: req };
+  // If we didn't reach the target count (some muscles starved), top up
+  // with any compatible exercise.
+  if (collected.length < request.exerciseCount) {
+    const needMore = request.exerciseCount - collected.length;
+    const fallbackCtx = { ...ctx, targetMuscle: request.muscle };
+    const scored = pool
+      .filter((e) => !alreadyChosen.has(e.id))
+      .map((ex) => ({ ex, score: scoreExercise(ex, fallbackCtx) }))
+      .filter((s) => s.score !== null)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, needMore);
+    for (const { ex } of scored) {
+      alreadyChosen.add(ex.id);
+      collected.push({ ...ex, _targetMuscle: request.muscle });
+    }
   }
 
+  if (collected.length === 0) {
+    return { exercises: [], conditionKeys, intensity, request, empty: true };
+  }
+
+  // Build prescriptions, then layer techniques on top.
+  const prescribed = collected.map((ex) =>
+    buildPrescription(ex, { ...ctx, targetMuscleForCard: ex._targetMuscle }),
+  );
+  const withTechniques = applyTechniques(prescribed, request.level);
+
   return {
-    exercises: chosen,
+    exercises: withTechniques,
     conditionKeys,
     intensity,
-    request: req,
-    requestedCount: req.exerciseCount || null,
-    availableMatches: baseScored.length,
+    request,
     createdAt: new Date().toISOString(),
     empty: false,
   };
 }
 
-function addIfMatch(list, t, re, value) {
-  if (re.test(t) && !list.includes(value)) list.push(value);
-}
+// =================================================================
+// EXERCISE REPLACEMENT
+// =================================================================
 
-function hasNegatedEquipment(t, keywordPattern) {
-  const re = new RegExp(
-    `(?:no tengo|no hay|sin|excepto|menos|salvo|máquinas no|maquinas no|no máquinas|no maquinas|todo excepto|todas menos|todos menos|lo unico que no tengo|lo único que no tengo)[^.!?,;]{0,60}${keywordPattern}`,
-    'i',
-  );
-
-  return re.test(t);
-}
-
-function addEquipmentIfMentioned(list, t, keywordPattern, value) {
-  const re = new RegExp(keywordPattern, 'i');
-
-  if (!re.test(t)) return;
-  if (hasNegatedEquipment(t, keywordPattern)) return;
-
-  if (!list.includes(value)) list.push(value);
-}
-
-function parseEquipmentFromText(t) {
-  const equipment = [];
-
-  const saysAllExceptMachines =
-    /\b(todo|todos|todas|tengo todo|tengo todos|tengo todas)\b/.test(t) &&
-    /\b(excepto|menos|salvo)\b/.test(t) &&
-    /\b(machines?|m[aá]quinas?|maquinas?|gym|gimnasio|polea|cable|cables)\b/.test(t);
-
-  const saysOnlyMissingMachines =
-    /\blo [uú]nico que no tengo\b/.test(t) &&
-    /\b(machines?|m[aá]quinas?|maquinas?|gym|gimnasio|polea|cable|cables)\b/.test(t);
-
-  const saysMachinesNo =
-    /\b(m[aá]quinas?|maquinas?|machines?|gym|gimnasio|polea|cable|cables)\s+no\b/.test(t) ||
-    /\bno\s+(m[aá]quinas?|maquinas?|machines?|gym|gimnasio|polea|cable|cables)\b/.test(t);
-
-  if (saysAllExceptMachines || saysOnlyMissingMachines || saysMachinesNo) {
-    return ALL_REAL_EQUIPMENT.filter((item) => item !== 'machines');
-  }
-
-  if (
-    /\b(no equipment|sin equipo|sin material|bodyweight|peso corporal|sin pesas|sin gym|sin gimnasio|en casa|at home|home workout|casa)\b/.test(
-      t,
-    )
-  ) {
-    equipment.push('none');
-  }
-
-  addEquipmentIfMentioned(
-    equipment,
-    t,
-    '\\b(dumbbell|dumbbells|mancuernas?|pesas? de mano)\\b',
-    'dumbbells',
-  );
-
-  addEquipmentIfMentioned(
-    equipment,
-    t,
-    '\\b(barbell|barra ol[ií]mpica|con barra)\\b',
-    'barbell',
-  );
-
-  addEquipmentIfMentioned(
-    equipment,
-    t,
-    '\\b(bands?|bandas?|elasticos?|el[aá]sticas?|tubular)\\b',
-    'bands',
-  );
-
-  addEquipmentIfMentioned(
-    equipment,
-    t,
-    '\\b(kettlebell|pesa rusa|kettle)\\b',
-    'kettlebell',
-  );
-
-  addEquipmentIfMentioned(
-    equipment,
-    t,
-    '\\b(pelota de ejercicio|pelota|exercise ball|swiss ball|stability ball)\\b',
-    'exercise_ball',
-  );
-
-  addEquipmentIfMentioned(
-    equipment,
-    t,
-    '\\b(bal[oó]n medicinal|medicine ball)\\b',
-    'medicine_ball',
-  );
-
-  addEquipmentIfMentioned(
-    equipment,
-    t,
-    '\\b(machines?|m[aá]quinas?|maquinas?|gym|gimnasio|polea|cable|cables)\\b',
-    'machines',
-  );
-
-  return unique(equipment);
-}
-
-function parseConditionStatusFromText(t) {
-  if (
-    /\b(sin lesiones|sin lesi[oó]n|sin dolor|no injuries|no injury|no pain|no medical condition|sin condici[oó]n médica|ninguna lesi[oó]n|ning[uú]n dolor|ninguna|nada|no)\b/.test(
-      t,
-    )
-  ) {
-    return 'none';
-  }
-
-  if (
-    /\b(dolor|lesi[oó]n|lesion|rodilla|espalda|hombro|embaraz|pregnan|pain|injur|knee|back pain|shoulder pain|shoulder injury)\b/.test(
-      t,
-    )
-  ) {
-    return 'described';
-  }
-
-  return null;
-}
-
-export function parseRequestText(text) {
-  const t = (text || '').toLowerCase();
-  const muscles = [];
-  const equipment = [];
-
-  const req = {
-    ...DEFAULT_REQUEST,
-    muscles,
-    equipment,
-    condition: text || '',
-  };
-
-  const countMatch = t.match(
-    /(?:dame|quiero|hazme|genera|generate|give me|build me|make me)?\s*(\d{1,2})\s*(?:ejercicios?|exercises?|movimientos?|moves?)\b/,
-  );
-
-  if (countMatch) req.exerciseCount = clampExerciseCount(countMatch[1]);
-
-  if (/\b(strength|fuerza)\b/.test(t)) req.goal = 'strength';
-  else if (/\b(hypertrophy|muscle|hipertrofia|m[uú]sculo|masa|crecer|volumen)\b/.test(t)) {
-    req.goal = 'hypertrophy';
-  } else if (/\b(endurance|cardio|resistencia|aer[oó]bico)\b/.test(t)) {
-    req.goal = 'endurance';
-  } else if (/\b(fat ?loss|weight ?loss|adelgaza|grasa|perder peso|definici[oó]n|quemar)\b/.test(t)) {
-    req.goal = 'fatloss';
-  } else if (/\b(mobility|stretch|movilidad|estirar|flexibilidad|elasticidad)\b/.test(t)) {
-    req.goal = 'mobility';
-  }
-
-  addIfMatch(muscles, t, /\b(pecho|chest|pectorales?|pecs)\b/, 'chest');
-  addIfMatch(muscles, t, /\b(espalda|back)\b/, 'back');
-  addIfMatch(muscles, t, /\b(dorsales?|lats?|lat)\b/, 'lats');
-  addIfMatch(muscles, t, /\b(hombros?|shoulders?|delto[ií]des?|deltoid)\b/, 'shoulders');
-  addIfMatch(muscles, t, /\b(b[ií]ceps|biceps|bicep)\b/, 'biceps');
-  addIfMatch(muscles, t, /\b(tr[ií]ceps|triceps)\b/, 'triceps');
-  addIfMatch(muscles, t, /\b(trapecio|trapezius|traps?|trapecios)\b/, 'traps');
-  addIfMatch(muscles, t, /\b(antebrazos?|forearms?)\b/, 'forearms');
-  addIfMatch(muscles, t, /\b(cu[aá]driceps|quadriceps|quads?|cuads?)\b/, 'quadriceps');
-  addIfMatch(muscles, t, /\b(isquios?|hamstrings?|isquiotibiales?|f[ée]moral)\b/, 'hamstrings');
-  addIfMatch(muscles, t, /\b(gl[uú]teos?|glutes?|nalgas?|cola|booty)\b/, 'glutes');
-  addIfMatch(muscles, t, /\b(pantorrillas?|gemelos?|calves?|s[oó]leo)\b/, 'calves');
-  addIfMatch(muscles, t, /\b(core|abdomen|abs|abdominales?|abdominal)\b/, 'core');
-
-  addIfMatch(muscles, t, /\b(pierna completa|piernas?|legs|tren inferior|lower body|parte inferior)\b/, 'legs');
-  addIfMatch(muscles, t, /\b(tren superior|upper body|parte superior|torso superior)\b/, 'upper');
-  addIfMatch(muscles, t, /\b(empuj[eo]|push|empujar)\b/, 'push');
-  addIfMatch(muscles, t, /\b(tir[oó]n|pull|tirar|jalar)\b/, 'pull');
-  addIfMatch(muscles, t, /\b(full[- ]?body|cuerpo completo|todo el cuerpo|cuerpo entero)\b/, 'full_body');
-
-  equipment.push(...parseEquipmentFromText(t));
-
-  const minMatch = t.match(/(\d{1,3})\s*(min|minute|minuto)/);
-
-  if (minMatch) {
-    req.time = parseInt(minMatch[1], 10);
-  } else {
-    const hourMatch = t.match(/(\d+(?:\.\d+)?)\s*(hour|hora|hr)/);
-
-    if (hourMatch) req.time = Math.round(parseFloat(hourMatch[1]) * 60);
-    else if (/\b(quick|r[aá]pid|short|corto|breve)\b/.test(t)) req.time = 15;
-    else if (/\b(long|largo|extenso|completo)\b/.test(t)) req.time = 60;
-  }
-
-  if (/\b(beginner|principiante|nuevo|novato|empezando|baja intensidad|suave)\b/.test(t)) {
-    req.level = 'beginner';
-  } else if (/\b(intermediate|intermedio|medio|moderado|media intensidad)\b/.test(t)) {
-    req.level = 'intermediate';
-  } else if (/\b(advanced|avanzado|experto|atleta|alta intensidad|intenso)\b/.test(t)) {
-    req.level = 'advanced';
-  }
-
-  const conditionStatus = parseConditionStatusFromText(t);
-
-  if (conditionStatus) {
-    req.conditionStatus = conditionStatus;
-  }
-
-  req.muscles = muscles.length ? unique(muscles) : [];
-  req.muscle = req.muscles[0] || null;
-  req.muscleStatus = muscles.length ? 'selected' : null;
-  req.equipment = equipment.length ? unique(equipment) : ['any'];
-
-  return req;
-}
-
-export function mergeRequestDraft(previous = {}, next = {}) {
-  const prev = normalizeRequest(previous);
-  const parsedNext = normalizeRequest(next);
-
-  const nextHasSpecificMuscles = parsedNext.muscleStatus === 'selected';
-  const nextHasSpecificEquipment = !parsedNext.equipment.includes('any');
-
-  return normalizeRequest({
-    ...prev,
-    goal: parsedNext.goal && parsedNext.goal !== 'general' ? parsedNext.goal : prev.goal,
-    muscles: nextHasSpecificMuscles ? parsedNext.muscles : prev.muscles,
-    muscle: nextHasSpecificMuscles ? parsedNext.muscles[0] : prev.muscle,
-    muscleStatus: nextHasSpecificMuscles ? 'selected' : prev.muscleStatus,
-    equipment: nextHasSpecificEquipment ? parsedNext.equipment : prev.equipment,
-    time: parsedNext.time ?? prev.time,
-    level: parsedNext.level ?? prev.level,
-    exerciseCount: parsedNext.exerciseCount ?? prev.exerciseCount,
-    conditionStatus: parsedNext.conditionStatus ?? prev.conditionStatus,
-    condition: [prev.condition, next.condition].filter(Boolean).join(' '),
-  });
-}
-
-export function applyAnswerToClarifyingField(previous, parsed, field, rawText = '') {
-  const next = { ...parsed };
-
-  if (field === 'condition') {
-    if (
-      /\b(no|nada|ninguna|sin lesiones|sin lesi[oó]n|sin dolor|no pain|no injury|no injuries|ninguna lesi[oó]n|ning[uú]n dolor)\b/i.test(
-        rawText,
-      )
-    ) {
-      next.conditionStatus = 'none';
-      next.condition = '';
-    } else {
-      next.conditionStatus = 'described';
-      next.condition = rawText;
-    }
-  }
-
-  return mergeRequestDraft(previous, next);
-}
-
-export function getNextClarifyingField(request = {}) {
-  const req = normalizeRequest(request);
-
-  if (!req.muscleStatus) return 'muscles';
-  if (!req.time && !req.exerciseCount) return 'time';
-  if (!req.level) return 'level';
-  if (!req.goal || req.goal === 'general') return 'goal';
-  if (!req.equipment || req.equipment.includes('any')) return 'equipment';
-  if (!req.conditionStatus) return 'condition';
-
-  return null;
-}
-
-export function buildClarifyingQuestion(request = {}, lang = 'en', field = null) {
-  const next = field || getNextClarifyingField(request);
-
-  const questions = {
-    es: {
-      muscles: '¿Qué grupo muscular quieres trabajar? Puedes elegir uno o varios.',
-      time: '¿Cuántos ejercicios quieres o cuánto tiempo tienes disponible?',
-      level: '¿Qué nivel de intensidad buscas?',
-      goal: '¿Cuál es tu objetivo principal?',
-      equipment: '¿Qué equipo tienes disponible? Selecciona uno o varios.',
-      condition: '¿Tienes alguna lesión o condición médica que deba tomar en cuenta?',
-    },
-    en: {
-      muscles: 'What muscle group do you want to train? You can choose one or several.',
-      time: 'How many exercises do you want or how much time do you have?',
-      level: 'What intensity level are you looking for?',
-      goal: 'What is your main goal?',
-      equipment: 'What equipment do you have available? Select one or several.',
-      condition: 'Do you have any injury or medical condition I should consider?',
-    },
-  };
-
-  return questions[lang]?.[next] || questions.en[next] || null;
-}
-
-export function replaceExerciseInRoutine(routine, index, exercises) {
+/**
+ * Replace one exercise in a routine without touching the others.
+ * Picks an alternative that:
+ *  - hits the same target muscle
+ *  - respects equipment, level, conditions
+ *  - avoids any exercise already in the routine
+ */
+export function replaceExercise(routine, exerciseIndex, exercises, conditionKeys = []) {
   if (!routine || !Array.isArray(routine.exercises)) return null;
-
-  const current = routine.exercises[index];
-
+  const current = routine.exercises[exerciseIndex];
   if (!current) return null;
 
-  const req = normalizeRequest(routine.request);
-  const avoidTags = getAvoidTags(routine.conditionKeys || []);
-  const intensity = getIntensityModifier(routine.conditionKeys || []);
-  const targetMuscle = current.targetMuscle || req.muscles[0];
-  const wantedSection = current.muscleSection?.key || inferMuscleSection(current, targetMuscle).key;
+  const request = routine.request || normalizeRequest({});
+  const avoidTags = getAvoidTags(conditionKeys);
+  const intensity = getIntensityModifier(conditionKeys);
 
-  const used = routine.exercises.filter((_, i) => i !== index);
+  const profile = LEVEL_PROFILE[request.level] || LEVEL_PROFILE.balanced;
+  const userLevelOrder = LEVEL_ORDER[
+    request.level === 'beginner'
+      ? 'beginner'
+      : request.level === 'gym_rat' || request.level === 'advanced'
+        ? 'expert'
+        : 'intermediate'
+  ];
 
-  const pool = exercises.filter((e) =>
-    Array.isArray(e.images) ? e.images.length > 0 : !!e.gif,
+  // Target muscle — try the original assignment first, otherwise primary.
+  const targetMuscle =
+    current._targetMuscle ||
+    (current.primaryMuscles && current.primaryMuscles[0]) ||
+    request.muscle;
+
+  const ctx = {
+    goal: request.goal,
+    levelKey: request.level,
+    capLevel: profile.capLevel,
+    userLevelOrder,
+    equipment: request.equipment,
+    avoidTags,
+    intensity,
+    targetMuscle,
+    preferredSubgroup: current.subgroup || inferSubgroup(current, targetMuscle),
+  };
+
+  const usedIds = new Set(routine.exercises.map((e) => e.id));
+
+  const pool = (exercises || []).filter(
+    (e) => (Array.isArray(e.images) ? e.images.length > 0 : !!e.gif) && !usedIds.has(e.id),
   );
 
-  const rankedSameSection = pool
-    .map((ex) => ({
-      ex,
-      score: scoreExercise(ex, req, avoidTags, targetMuscle, wantedSection),
-    }))
-    .filter(({ ex, score }) => score !== null && !isDuplicateExercise(ex, used) && ex.id !== current.id)
+  if (pool.length === 0) return null;
+
+  // Score, sort, pick the top — but with a small randomization in scoreExercise
+  // so consecutive replacements aren't identical.
+  const scored = pool
+    .map((ex) => ({ ex, score: scoreExercise(ex, ctx) }))
+    .filter((s) => s.score !== null)
     .sort((a, b) => b.score - a.score);
 
-  let replacement = rankedSameSection[0]?.ex || null;
+  if (scored.length === 0) return null;
 
-  if (!replacement) {
-    const rankedAnySection = pool
-      .map((ex) => ({
-        ex,
-        score: scoreExercise(ex, req, avoidTags, targetMuscle, null),
-      }))
-      .filter(({ ex, score }) => score !== null && !isDuplicateExercise(ex, used) && ex.id !== current.id)
-      .sort((a, b) => b.score - a.score);
+  const next = scored[0].ex;
+  const prescribed = buildPrescription(
+    { ...next, _targetMuscle: targetMuscle },
+    { ...ctx, targetMuscleForCard: targetMuscle },
+  );
+  prescribed.technique = current.technique || 'straight';
+  if (current.supersetWith) prescribed.supersetWith = current.supersetWith;
 
-    replacement = rankedAnySection[0]?.ex || null;
-  }
-
-  if (!replacement) return null;
-
-  const nextExercises = [...routine.exercises];
-
-  nextExercises[index] = {
-    ...buildPrescription(replacement, req, intensity, targetMuscle),
-    sets: current.sets,
-    reps: current.reps,
-    rest: current.rest,
-  };
+  const newExercises = [...routine.exercises];
+  newExercises[exerciseIndex] = prescribed;
 
   return {
     ...routine,
-    exercises: nextExercises,
+    exercises: newExercises,
+    updatedAt: new Date().toISOString(),
   };
 }
+
+// =================================================================
+// WEEKLY SPLITS
+// =================================================================
+
+const SPLITS = {
+  // Keys: number of training days per week.
+  // Each split is an array of day plans. Each day has a label and a muscle target.
+  2: [
+    { id: 'upper', label: { en: 'Upper body', es: 'Tren superior' }, muscle: 'upper' },
+    { id: 'lower', label: { en: 'Lower body', es: 'Tren inferior' }, muscle: 'lower' },
+  ],
+  3: [
+    { id: 'push', label: { en: 'Push', es: 'Empuje' }, muscle: 'push' },
+    { id: 'pull', label: { en: 'Pull', es: 'Tirón' }, muscle: 'pull' },
+    { id: 'legs', label: { en: 'Legs', es: 'Piernas' }, muscle: 'legs' },
+  ],
+  4: [
+    { id: 'upper1', label: { en: 'Upper A', es: 'Superior A' }, muscle: 'upper' },
+    { id: 'lower1', label: { en: 'Lower A', es: 'Inferior A' }, muscle: 'lower' },
+    { id: 'upper2', label: { en: 'Upper B', es: 'Superior B' }, muscle: 'upper' },
+    { id: 'lower2', label: { en: 'Lower B', es: 'Inferior B' }, muscle: 'lower' },
+  ],
+  5: [
+    { id: 'push', label: { en: 'Push', es: 'Empuje' }, muscle: 'push' },
+    { id: 'pull', label: { en: 'Pull', es: 'Tirón' }, muscle: 'pull' },
+    { id: 'legs', label: { en: 'Legs', es: 'Piernas' }, muscle: 'legs' },
+    { id: 'upper', label: { en: 'Upper', es: 'Superior' }, muscle: 'upper' },
+    { id: 'lower', label: { en: 'Lower', es: 'Inferior' }, muscle: 'lower' },
+  ],
+  6: [
+    { id: 'push1', label: { en: 'Push A', es: 'Empuje A' }, muscle: 'push' },
+    { id: 'pull1', label: { en: 'Pull A', es: 'Tirón A' }, muscle: 'pull' },
+    { id: 'legs1', label: { en: 'Legs A', es: 'Piernas A' }, muscle: 'legs' },
+    { id: 'push2', label: { en: 'Push B', es: 'Empuje B' }, muscle: 'push' },
+    { id: 'pull2', label: { en: 'Pull B', es: 'Tirón B' }, muscle: 'pull' },
+    { id: 'legs2', label: { en: 'Legs B', es: 'Piernas B' }, muscle: 'legs' },
+  ],
+};
+
+const BRO_SPLIT = [
+  { id: 'chest', label: { en: 'Chest', es: 'Pecho' }, muscle: 'chest' },
+  { id: 'back', label: { en: 'Back', es: 'Espalda' }, muscle: 'back' },
+  { id: 'legs', label: { en: 'Legs', es: 'Piernas' }, muscle: 'legs' },
+  { id: 'shoulders', label: { en: 'Shoulders', es: 'Hombros' }, muscle: 'shoulders' },
+  { id: 'arms', label: { en: 'Arms', es: 'Brazos' }, muscle: 'biceps' }, // arms day handled below
+];
+
+/**
+ * Pick the best split structure for the user.
+ */
+export function buildSplit(daysPerWeek, level = 'balanced', goal = 'general') {
+  const days = Math.max(2, Math.min(6, Number(daysPerWeek) || 3));
+
+  // Bro split makes sense at 5 days for hypertrophy gym_rat.
+  if (days === 5 && level === 'gym_rat' && goal === 'hypertrophy') {
+    return BRO_SPLIT.map((d) => ({ ...d }));
+  }
+
+  return (SPLITS[days] || SPLITS[3]).map((d) => ({ ...d }));
+}
+
+/**
+ * Generate a weekly plan: one routine per training day, plus rest days
+ * filled in to hit 7 calendar days.
+ */
+export function generateWeeklyRoutine(rawRequest, exercises, conditionKeys = []) {
+  const request = normalizeRequest({
+    goal: rawRequest.goal || 'general',
+    level: rawRequest.level || 'balanced',
+    equipment: rawRequest.equipment || ['any'],
+    exerciseCount: rawRequest.exerciseCount || 6,
+    sex: rawRequest.sex,
+    age: rawRequest.age,
+  });
+
+  const daysPerWeek = Math.max(2, Math.min(6, Number(rawRequest.daysPerWeek) || 3));
+  const split = buildSplit(daysPerWeek, request.level, request.goal);
+
+  const days = split.map((slot) => {
+    const dayRequest = {
+      ...request,
+      muscle: slot.muscle,
+    };
+    const routine = generateRoutine(dayRequest, exercises, conditionKeys);
+    return {
+      id: slot.id,
+      label: slot.label,
+      muscle: slot.muscle,
+      routine,
+    };
+  });
+
+  return {
+    type: 'weekly',
+    daysPerWeek,
+    split,
+    days,
+    conditionKeys,
+    request,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+// =================================================================
+// YOUTUBE LINK BUILDER
+// =================================================================
 
 export function youtubeSearchUrl(exerciseName, lang = 'en') {
   const prefix = lang === 'es' ? 'cómo hacer ' : 'how to do ';
   const q = encodeURIComponent(`${prefix}${exerciseName}`);
-
   return `https://www.youtube.com/results?search_query=${q}`;
 }

@@ -1,3 +1,4 @@
+// src/utils/pdfExport.js
 import { jsPDF } from 'jspdf';
 import { translations } from '../data/translations.js';
 import { CONDITIONS } from '../data/conditions.js';
@@ -25,14 +26,14 @@ export function exportRoutinePdf(routine, lang = 'en', routineName) {
   doc.setTextColor(31, 232, 122);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(28);
-  doc.text('GymAI', margin, 56);
+  doc.text('VIGORIX', margin, 56);
 
   doc.setTextColor(180, 180, 180);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
   const dateStr = new Date(routine.createdAt || Date.now()).toLocaleDateString(
     lang === 'es' ? 'es-ES' : 'en-US',
-    { year: 'numeric', month: 'long', day: 'numeric' }
+    { year: 'numeric', month: 'long', day: 'numeric' },
   );
   doc.text(dateStr, pageW - margin, 56, { align: 'right' });
 
@@ -51,13 +52,18 @@ export function exportRoutinePdf(routine, lang = 'en', routineName) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
-    const line = [
-      `${t.form.goal}: ${(t.form.goals[r.goal] || r.goal)}`,
-      `${t.form.muscle}: ${(t.form.muscles[r.muscle] || r.muscle)}`,
-      `${t.form.equipment}: ${(t.form.equipments[r.equipment] || r.equipment)}`,
-      `${t.form.time}: ${r.time} ${t.common.minutes}`,
-      `${t.form.level}: ${(t.form.levels[r.level] || r.level)}`,
-    ].join('   •   ');
+    const parts = [];
+    if (r.goal) parts.push(`${t.form.goal}: ${t.onboarding?.goals?.[r.goal] || r.goal}`);
+    if (r.muscle) parts.push(`${t.form.muscle}: ${t.form.muscleOptions?.[r.muscle] || r.muscle}`);
+    if (r.equipment) {
+      const equipmentLabel = Array.isArray(r.equipment)
+        ? r.equipment.map((e) => t.form.equipmentOptions?.[e] || e).join(', ')
+        : t.form.equipmentOptions?.[r.equipment] || r.equipment;
+      parts.push(`${t.form.equipment}: ${equipmentLabel}`);
+    }
+    if (r.time) parts.push(`${t.form.time}: ${r.time} ${t.common.minutes}`);
+    if (r.level) parts.push(`${t.form.level}: ${t.onboarding?.levels?.[r.level] || r.level}`);
+    const line = parts.join('   •   ');
     doc.text(line, margin, y + 12, { maxWidth: pageW - margin * 2 });
     y += 30;
   }
@@ -73,7 +79,7 @@ export function exportRoutinePdf(routine, lang = 'en', routineName) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(120, 70, 0);
-    doc.text(`⚠ ${t.safety.bannerTitle} — ${labels}`, margin + 12, y + 20);
+    doc.text(`! ${t.safety.bannerTitle} - ${labels}`, margin + 12, y + 20);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     const wrapped = doc.splitTextToSize(t.safety.bannerBody, pageW - margin * 2 - 24);
@@ -94,7 +100,6 @@ export function exportRoutinePdf(routine, lang = 'en', routineName) {
       y = margin;
     }
 
-    // Exercise card
     const cardH = 78;
     doc.setFillColor(248, 248, 248);
     doc.roundedRect(margin, y, pageW - margin * 2, cardH, 8, 8, 'F');
@@ -102,7 +107,8 @@ export function exportRoutinePdf(routine, lang = 'en', routineName) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
     doc.setTextColor(20, 20, 20);
-    doc.text(`${i + 1}. ${ex.name[lang] || ex.name.en}`, margin + 14, y + 22);
+    const exName = ex.name?.[lang] || ex.name?.en || ex.id;
+    doc.text(`${i + 1}. ${exName}`, margin + 14, y + 22);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(11);
@@ -138,6 +144,6 @@ export function exportRoutinePdf(routine, lang = 'en', routineName) {
 
   // ----- Save -----
   const safeName = (routineName || 'routine').replace(/[^\w\s-]/g, '').trim() || 'routine';
-  const filename = `gymai-${safeName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.pdf`;
+  const filename = `vigorix-${safeName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.pdf`;
   doc.save(filename);
 }
