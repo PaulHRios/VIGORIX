@@ -1,14 +1,17 @@
 {
-  "name": "gymai",
+  "name": "vigorix",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
-  "description": "Bilingual AI-assisted workout generator (Spanish/English)",
+  "description": "Bilingual AI-assisted workout generator (Spanish/English) with multi-source exercise database",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "npm run build && gh-pages -d dist"
+    "deploy": "npm run build && gh-pages -d dist",
+    "build:exercises": "node scripts/buildExerciseDatabase.mjs",
+    "validate:exercises": "node scripts/validateExerciseDatabase.mjs",
+    "db": "npm run build:exercises && npm run validate:exercises"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
