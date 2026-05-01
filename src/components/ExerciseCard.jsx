@@ -9,7 +9,7 @@ import { useLanguage } from '../hooks/useLanguage.jsx';
 import { RestTimer } from './RestTimer.jsx';
 import { addLog } from '../services/storageService.js';
 import { youtubeSearchUrl } from '../utils/workoutGenerator.js';
-import { localizeSubgroup } from '../data/translations.js';
+import { localizeSubgroup } from '../data/subgroupClassifier.js';
 
 function equipmentLabel(equipment, t) {
   const key = equipment || 'none';
@@ -22,7 +22,7 @@ function localizeMuscleName(name, t, lang) {
   return localizeSubgroup(k, lang) || t.form?.muscleOptions?.[k] || name;
 }
 
-export function ExerciseCard({ exercise, index, onReplace }) {
+export function ExerciseCard({ exercise, index, onReplace, routine }) {
   const { t, lang } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const [showLog, setShowLog] = useState(false);
@@ -35,11 +35,29 @@ export function ExerciseCard({ exercise, index, onReplace }) {
 
   const ytUrl = youtubeSearchUrl(exercise.youtubeQuery || exercise.name?.en || name, lang);
 
-  const primary = exercise.primaryMuscles?.[0];
-  const secondaries = exercise.secondaryMuscles || [];
-  const subgroup = exercise.subgroup;
+  // Prefer the normalized classifier muscles when available, fall back to raw.
+  const primary = exercise.main_muscle || exercise.primaryMuscles?.[0];
+  const secondaries =
+    exercise.secondary_normalized?.length
+      ? exercise.secondary_normalized
+      : exercise.secondaryMuscles || [];
+  const subgroup = exercise.sub_muscle || exercise.subgroup;
 
   const technique = exercise.technique && exercise.technique !== 'straight' ? exercise.technique : null;
+
+  // If this card is part of a superset/triset, find its partner(s) so we
+  // can display "Pair with: X" — critical for the gym-floor experience.
+  let partnerNames = [];
+  if (technique && routine?.exercises && exercise.supersetGroup) {
+    partnerNames = routine.exercises
+      .filter(
+        (e) =>
+          e !== exercise &&
+          e.supersetGroup === exercise.supersetGroup,
+      )
+      .map((e) => e.name?.[lang] || e.name?.en || e.id);
+  }
+
 
   async function handleReplace() {
     if (!onReplace) return;
@@ -81,6 +99,20 @@ export function ExerciseCard({ exercise, index, onReplace }) {
             <Tag label={t.exercise.techniques?.[technique] || technique} kind="technique" />
           )}
         </div>
+
+        {partnerNames.length > 0 && (
+          <div className="rounded-2xl border border-warn-amber/30 bg-warn-amber/5 px-3 py-2 text-[11px] text-warn-amber">
+            <span className="font-display uppercase tracking-wider">
+              {lang === 'es' ? 'Encadenar con' : 'Pair with'}:
+            </span>{' '}
+            <span className="text-neutral-200">{partnerNames.join(' + ')}</span>
+            <div className="mt-0.5 text-[10px] text-neutral-500">
+              {lang === 'es'
+                ? 'Sin descanso entre ejercicios. Descansa al terminar la serie.'
+                : 'No rest between exercises. Rest after the full set.'}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-3 gap-2">
           <Stat label={t.common.sets} value={exercise.sets} />
