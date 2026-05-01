@@ -228,6 +228,8 @@ export const translations = {
       title: 'Saved routines',
       empty: 'No saved routines yet. Build one and tap Save.',
       saveBtn: 'Save routine',
+      saveAndPdf: 'Save + PDF',
+      pdfOnly: 'PDF',
       named: 'Routine name',
       defaultName: 'Routine',
       weeklyName: 'Weekly plan',
@@ -505,6 +507,8 @@ export const translations = {
       title: 'Rutinas guardadas',
       empty: 'No tienes rutinas guardadas. Genera una y toca Guardar.',
       saveBtn: 'Guardar rutina',
+      saveAndPdf: 'Guardar + PDF',
+      pdfOnly: 'PDF',
       named: 'Nombre de la rutina',
       defaultName: 'Rutina',
       weeklyName: 'Plan semanal',
@@ -562,52 +566,6 @@ export const translations = {
 export const LANGS = ['en', 'es'];
 export const DEFAULT_LANG = 'en';
 
-// Localized labels for muscle subgroups (used in ExerciseCard).
-// Keys match the SECTION_LABELS in workoutGenerator + raw muscle names.
-export const SUBGROUP_LABELS = {
-  // Chest sections
-  upper_chest: { en: 'Upper chest', es: 'Pecho superior' },
-  middle_chest: { en: 'Middle chest', es: 'Pecho medio' },
-  lower_chest: { en: 'Lower chest', es: 'Pecho inferior' },
-  chest_isolation: { en: 'Chest isolation', es: 'Aislamiento de pecho' },
-
-  // Back
-  lats: { en: 'Lats', es: 'Dorsales' },
-  middle_back: { en: 'Middle back', es: 'Espalda media' },
-  lower_back: { en: 'Lower back', es: 'Espalda baja' },
-  traps: { en: 'Traps', es: 'Trapecio' },
-
-  // Legs
-  quadriceps: { en: 'Quadriceps', es: 'Cuádriceps' },
-  hamstrings: { en: 'Hamstrings', es: 'Femoral' },
-  glutes: { en: 'Glutes', es: 'Glúteos' },
-  calves: { en: 'Calves', es: 'Pantorrilla' },
-  adductors: { en: 'Adductors', es: 'Aductores' },
-  abductors: { en: 'Abductors', es: 'Abductores' },
-
-  // Shoulders
-  front_delts: { en: 'Front delts', es: 'Deltoide frontal' },
-  side_delts: { en: 'Side delts', es: 'Deltoide lateral' },
-  rear_delts: { en: 'Rear delts', es: 'Deltoide posterior' },
-  shoulders: { en: 'Shoulders', es: 'Hombros' },
-
-  // Arms
-  biceps: { en: 'Biceps', es: 'Bíceps' },
-  triceps: { en: 'Triceps', es: 'Tríceps' },
-  forearms: { en: 'Forearms', es: 'Antebrazos' },
-
-  // Other
-  chest: { en: 'Chest', es: 'Pecho' },
-  back: { en: 'Back', es: 'Espalda' },
-  abdominals: { en: 'Abs', es: 'Abdomen' },
-  core: { en: 'Core', es: 'Core' },
-  neck: { en: 'Neck', es: 'Cuello' },
-  general: { en: 'General', es: 'General' },
-};
-
-export function localizeSubgroup(key, lang = 'en') {
-  if (!key) return null;
-  const entry = SUBGROUP_LABELS[key];
-  if (!entry) return key;
-  return entry[lang] || entry.en || key;
-}
+// SUBGROUP_LABELS and localizeSubgroup live in src/data/subgroupClassifier.js
+// (single source of truth used by both the classifier and the UI).
+export { SUBGROUP_LABELS, localizeSubgroup } from './subgroupClassifier.js';
