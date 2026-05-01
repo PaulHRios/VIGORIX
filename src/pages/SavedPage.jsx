@@ -62,6 +62,7 @@ export function SavedPage() {
                     key={`${day.id}_${ex.id}_${i}`}
                     exercise={ex}
                     index={i}
+                    routine={day.routine}
                   />
                 )) || <p className="text-sm text-neutral-500">{t.weekly.rest}</p>}
               </div>
@@ -70,7 +71,7 @@ export function SavedPage() {
         ) : (
           <>
             {r.exercises.map((ex, i) => (
-              <ExerciseCard key={ex.id + '_' + i} exercise={ex} index={i} />
+              <ExerciseCard key={ex.id + '_' + i} exercise={ex} index={i} routine={r} />
             ))}
             <button
               onClick={() => exportRoutinePdf(r, lang, open.name)}

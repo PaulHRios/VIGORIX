@@ -198,6 +198,23 @@ export function BuilderPage() {
     exportRoutinePdf(routine, lang, t.saved.defaultName);
   }
 
+  function handleExportWeekly() {
+    if (!weekly) return;
+    exportRoutinePdf(weekly, lang, t.saved.weeklyName);
+  }
+
+  async function handleSaveAndPdfSingle() {
+    if (!routine) return;
+    await handleSaveSingle();
+    handleExportSingle();
+  }
+
+  async function handleSaveAndPdfWeekly() {
+    if (!weekly) return;
+    await handleSaveWeekly();
+    handleExportWeekly();
+  }
+
   // ---------- LOADING ----------
   if (busy) return <LoadingScreen />;
 
@@ -226,17 +243,23 @@ export function BuilderPage() {
             key={`${ex.id}_${i}`}
             exercise={ex}
             index={i}
+            routine={routine}
             onReplace={() => handleReplace(i)}
           />
         ))}
 
-        <div className="card flex gap-2 p-4">
-          <button onClick={handleSaveSingle} className="btn-primary flex-1">
-            {savedFlash ? `✓ ${t.common.saved}` : t.saved.saveBtn}
+        <div className="card space-y-2 p-4">
+          <button onClick={handleSaveAndPdfSingle} className="btn-primary w-full">
+            {savedFlash ? `✓ ${t.common.saved}` : t.saved.saveAndPdf}
           </button>
-          <button onClick={handleExportSingle} className="btn-ghost flex-1">
-            {t.common.export}
-          </button>
+          <div className="flex gap-2">
+            <button onClick={handleSaveSingle} className="btn-ghost flex-1">
+              {t.saved.saveBtn}
+            </button>
+            <button onClick={handleExportSingle} className="btn-ghost flex-1">
+              {t.saved.pdfOnly}
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -283,6 +306,7 @@ export function BuilderPage() {
                     key={`${day.id}_${ex.id}_${i}`}
                     exercise={ex}
                     index={i}
+                    routine={day.routine}
                     onReplace={() => handleReplaceWeekly(dayIndex, i)}
                   />
                 ))
@@ -291,10 +315,18 @@ export function BuilderPage() {
           </details>
         ))}
 
-        <div className="card flex gap-2 p-4">
-          <button onClick={handleSaveWeekly} className="btn-primary flex-1">
-            {savedFlash ? `✓ ${t.common.saved}` : t.saved.saveBtn}
+        <div className="card space-y-2 p-4">
+          <button onClick={handleSaveAndPdfWeekly} className="btn-primary w-full">
+            {savedFlash ? `✓ ${t.common.saved}` : t.saved.saveAndPdf}
           </button>
+          <div className="flex gap-2">
+            <button onClick={handleSaveWeekly} className="btn-ghost flex-1">
+              {t.saved.saveBtn}
+            </button>
+            <button onClick={handleExportWeekly} className="btn-ghost flex-1">
+              {t.saved.pdfOnly}
+            </button>
+          </div>
         </div>
       </div>
     );
