@@ -44,7 +44,7 @@ const MUSCLE_OPTIONS = [
 
 const COUNT_OPTIONS = [4, 5, 6, 7, 8, 10];
 const TIME_OPTIONS = [20, 30, 45, 60, 90];
-const DAYS_OPTIONS = [2, 3, 4, 5, 6];
+const DAYS_OPTIONS = [2, 3, 4, 5, 6, 7];
 
 export function BuilderPage() {
   const { t, lang } = useLanguage();
@@ -298,7 +298,9 @@ export function BuilderPage() {
             </summary>
 
             <div className="space-y-3 border-t border-white/5 px-3 py-4">
-              {day.routine?.empty ? (
+              {day.cardio ? (
+                <CardioDay options={day.cardioOptions} t={t} lang={lang} />
+              ) : day.routine?.empty ? (
                 <p className="text-sm text-neutral-400">{t.weekly.rest}</p>
               ) : (
                 day.routine.exercises.map((ex, i) => (
@@ -452,17 +454,29 @@ export function BuilderPage() {
           </button>
 
           <Section title={t.builder.daysQ} hint={t.builder.daysHint}>
-            <div className="grid grid-cols-5 gap-1.5">
-              {DAYS_OPTIONS.map((n) => (
-                <Chip
-                  key={n}
-                  active={daysPerWeek === n}
-                  onClick={() => setDaysPerWeek(n)}
-                  label={String(n)}
-                  fill
-                />
-              ))}
+            <div className="grid grid-cols-6 gap-1.5">
+              {DAYS_OPTIONS.map((n) => {
+                const sevenLocked = n === 7 && profile.level !== 'gym_rat' && profile.level !== 'advanced';
+                return (
+                  <Chip
+                    key={n}
+                    active={daysPerWeek === n}
+                    onClick={() => {
+                      if (sevenLocked) return;
+                      setDaysPerWeek(n);
+                    }}
+                    label={String(n)}
+                    fill
+                    disabled={sevenLocked}
+                  />
+                );
+              })}
             </div>
+            {daysPerWeek === 7 && (
+              <p className="mt-2 rounded-2xl border border-warn-amber/30 bg-warn-amber/10 p-2.5 text-[11px] text-warn-amber">
+                {t.builder.sevenDayHint}
+              </p>
+            )}
           </Section>
 
           <Section title={t.builder.splitPreview}>
@@ -470,12 +484,22 @@ export function BuilderPage() {
               {split.map((slot, i) => (
                 <div
                   key={slot.id}
-                  className="flex items-center justify-between rounded-2xl border border-white/5 bg-ink-800/40 px-3 py-2 text-sm"
+                  className={`flex items-center justify-between rounded-2xl border px-3 py-2 text-sm ${
+                    slot.cardio
+                      ? 'border-warn-amber/30 bg-warn-amber/5'
+                      : 'border-white/5 bg-ink-800/40'
+                  }`}
                 >
                   <span className="font-mono text-xs text-neutral-500">
                     {t.weekly.day} {i + 1}
                   </span>
-                  <span className="heading-display text-sm">{slot.label[lang]}</span>
+                  <span
+                    className={`heading-display text-sm ${
+                      slot.cardio ? 'text-warn-amber' : ''
+                    }`}
+                  >
+                    {slot.label[lang]}
+                  </span>
                 </div>
               ))}
             </div>
@@ -556,17 +580,54 @@ function Section({ title, hint, children }) {
   );
 }
 
-function Chip({ active, onClick, label, fill }) {
+function CardioDay({ options, t, lang }) {
+  if (!options || options.length === 0) {
+    return <p className="text-sm text-neutral-400">{t.weekly.rest}</p>;
+  }
+  return (
+    <div className="space-y-3">
+      <p className="text-xs leading-relaxed text-neutral-300">
+        {t.weekly.cardioIntro}
+      </p>
+      {options.map((opt) => (
+        <div
+          key={opt.id}
+          className="flex items-start justify-between gap-3 rounded-2xl border border-white/5 bg-ink-800/40 p-3"
+        >
+          <div className="min-w-0 flex-1">
+            <div className="font-display text-[10px] uppercase tracking-wider text-neon-400">
+              {t.weekly.cardioModes[opt.mode] || opt.mode}
+            </div>
+            <div className="mt-0.5 text-sm text-neutral-100">
+              {opt.label[lang] || opt.label.en}
+            </div>
+          </div>
+          <span className="shrink-0 rounded-full bg-neon-500/10 px-2 py-1 font-mono text-[10px] text-neon-300">
+            ~{opt.minutes}m
+          </span>
+        </div>
+      ))}
+      <p className="rounded-2xl border border-white/5 bg-ink-800/30 p-3 text-[11px] leading-relaxed text-neutral-400">
+        {t.weekly.cardioTip}
+      </p>
+    </div>
+  );
+}
+
+function Chip({ active, onClick, label, fill, disabled }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={`${
         fill ? 'flex-1 justify-center' : ''
       } inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium transition-all ${
-        active
-          ? 'border-neon-500 bg-neon-500/10 text-neon-200 shadow-glow'
-          : 'border-white/10 bg-white/[0.03] text-neutral-300 hover:bg-white/[0.06]'
+        disabled
+          ? 'cursor-not-allowed border-white/5 bg-white/[0.01] text-neutral-600'
+          : active
+            ? 'border-neon-500 bg-neon-500/10 text-neon-200 shadow-glow'
+            : 'border-white/10 bg-white/[0.03] text-neutral-300 hover:bg-white/[0.06]'
       }`}
     >
       {label}

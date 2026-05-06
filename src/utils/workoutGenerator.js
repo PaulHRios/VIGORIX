@@ -94,10 +94,10 @@ const SCHEMES = {
 };
 
 const LEVEL_PROFILE = {
-  beginner: { setsMul: 0.75, allowSuperset: false, allowTriset: false, allowDropset: false, capLevel: 'beginner' },
-  balanced: { setsMul: 1.00, allowSuperset: false, allowTriset: false, allowDropset: false, capLevel: 'intermediate' },
-  advanced: { setsMul: 1.05, allowSuperset: true,  allowTriset: false, allowDropset: false, capLevel: 'advanced' },
-  gym_rat:  { setsMul: 1.15, allowSuperset: true,  allowTriset: true,  allowDropset: true,  capLevel: 'advanced' },
+  beginner: { setsMul: 0.75, allowSuperset: false, allowBiset: false, allowTriset: false, allowDropset: false, capLevel: 'beginner' },
+  balanced: { setsMul: 1.00, allowSuperset: false, allowBiset: false, allowTriset: false, allowDropset: false, capLevel: 'intermediate' },
+  advanced: { setsMul: 1.05, allowSuperset: true,  allowBiset: true,  allowTriset: false, allowDropset: false, capLevel: 'advanced' },
+  gym_rat:  { setsMul: 1.15, allowSuperset: true,  allowBiset: true,  allowTriset: true,  allowDropset: true,  capLevel: 'advanced' },
 };
 
 const LEVEL_ORDER = { beginner: 1, intermediate: 2, advanced: 3, expert: 3 };
@@ -108,6 +108,17 @@ const ANTAGONIST_PAIRS = [
   ['chest', 'back'],
   ['quads', 'hamstrings'],
   ['shoulders', 'back'],
+];
+
+// Bi-set candidate pairs (push/pull within the same training session).
+// A bi-set chains two exercises for opposing/related muscles back to back, then
+// rests. Common examples: bicep + tricep, chest + back, quad + hamstring.
+const BISET_PAIRS = [
+  ['biceps', 'triceps'],
+  ['chest', 'back'],
+  ['quads', 'hamstrings'],
+  ['shoulders', 'biceps'],
+  ['shoulders', 'triceps'],
 ];
 
 // =================================================================
@@ -328,10 +339,15 @@ function applyTechniques(exercises, levelKey) {
   const profile = LEVEL_PROFILE[levelKey] || LEVEL_PROFILE.balanced;
   const list = exercises.map((ex) => ({ ...ex, technique: 'straight' }));
 
-  if (!profile.allowSuperset && !profile.allowTriset && !profile.allowDropset) return list;
+  if (!profile.allowSuperset && !profile.allowBiset && !profile.allowTriset && !profile.allowDropset) {
+    return list;
+  }
 
-  // ---- 1) ANTAGONIST SUPERSETS ----
-  if (profile.allowSuperset) {
+  // ---- 1) BI-SETS (advanced + gym_rat) ----
+  // A bi-set chains two exercises for opposing or related muscles (bicep+tricep,
+  // chest+back, etc.). Done back-to-back, then rest at the end. Maximizes
+  // density without overloading a single muscle.
+  if (profile.allowBiset) {
     const used = new Set();
     for (let i = 0; i < list.length; i++) {
       if (used.has(i)) continue;
@@ -344,10 +360,48 @@ function applyTechniques(exercises, levelKey) {
         if (used.has(j)) continue;
         const b = list[j];
         if (b.exercise_type === 'compound') continue;
+        if (!areBisetCandidates(a.main_muscle, b.main_muscle)) continue;
+
+        let s = 1;
+        // Antagonist pairing scores higher than mere "related" pairing.
+        if (areAntagonists(a.main_muscle, b.main_muscle)) s += 4;
+        if (a.equipment === b.equipment) s += 3;
+        if (j === i + 1) s += 2;
+        if (s > bestScore) { bestScore = s; bestJ = j; }
+      }
+      if (bestJ === -1) continue;
+      const b = list[bestJ];
+      const g = `bs_${i}`;
+      a.technique = 'biset';
+      b.technique = 'biset';
+      a.supersetWith = b.id;
+      b.supersetWith = a.id;
+      a.supersetGroup = g;
+      b.supersetGroup = g;
+      used.add(i); used.add(bestJ);
+    }
+  }
+
+  // ---- 2) ANTAGONIST SUPERSETS (only for unused exercises) ----
+  if (profile.allowSuperset) {
+    const used = new Set(list.map((e, idx) => (e.technique !== 'straight' ? idx : -1)).filter((i) => i >= 0));
+    for (let i = 0; i < list.length; i++) {
+      if (used.has(i)) continue;
+      const a = list[i];
+      if (a.technique !== 'straight') continue;
+      if (a.exercise_type === 'compound') continue;
+
+      let bestJ = -1;
+      let bestScore = -1;
+      for (let j = i + 1; j < list.length; j++) {
+        if (used.has(j)) continue;
+        const b = list[j];
+        if (b.technique !== 'straight') continue;
+        if (b.exercise_type === 'compound') continue;
         if (!areAntagonists(a.main_muscle, b.main_muscle)) continue;
 
         let s = 1;
-        if (a.equipment === b.equipment) s += 3; // same machine = real-gym efficiency
+        if (a.equipment === b.equipment) s += 3;
         if (j === i + 1) s += 2;
         if (s > bestScore) { bestScore = s; bestJ = j; }
       }
@@ -364,7 +418,9 @@ function applyTechniques(exercises, levelKey) {
     }
   }
 
-  // ---- 2) TRI-SETS for gym_rat ----
+  // ---- 3) TRI-SETS for gym_rat ----
+  // A tri-set is three exercises for the SAME muscle (or related cluster) done
+  // back-to-back, then rest. Higher metabolic stress, brutal in the best way.
   if (profile.allowTriset && list.length >= 5) {
     for (let i = 0; i < list.length - 2; i++) {
       const a = list[i], b = list[i + 1], c = list[i + 2];
@@ -379,7 +435,7 @@ function applyTechniques(exercises, levelKey) {
     }
   }
 
-  // ---- 3) DROP SET for gym_rat ----
+  // ---- 4) DROP SET for gym_rat ----
   if (profile.allowDropset) {
     for (let i = list.length - 1; i >= 0; i--) {
       const ex = list[i];
@@ -391,6 +447,11 @@ function applyTechniques(exercises, levelKey) {
   }
 
   return list;
+}
+
+function areBisetCandidates(mainA, mainB) {
+  if (!mainA || !mainB) return false;
+  return BISET_PAIRS.some(([x, y]) => (mainA === x && mainB === y) || (mainA === y && mainB === x));
 }
 
 function areAntagonists(mainA, mainB) {
@@ -572,6 +633,53 @@ const SPLITS = {
     { id: 'pull2', label: { en: 'Pull B', es: 'Tirón B' },  muscle: 'pull' },
     { id: 'legs2', label: { en: 'Legs B', es: 'Piernas B' }, muscle: 'legs' },
   ],
+  // 7-day plans are extra-aggressive — only meaningful for advanced/gym_rat.
+  // We add a dedicated cardio/conditioning day on top of a PPL x2 split.
+  7: [
+    { id: 'push1',  label: { en: 'Push A',  es: 'Empuje A' }, muscle: 'push' },
+    { id: 'pull1',  label: { en: 'Pull A',  es: 'Tirón A' },  muscle: 'pull' },
+    { id: 'legs1',  label: { en: 'Legs A',  es: 'Piernas A' }, muscle: 'legs' },
+    { id: 'push2',  label: { en: 'Push B',  es: 'Empuje B' }, muscle: 'push' },
+    { id: 'pull2',  label: { en: 'Pull B',  es: 'Tirón B' },  muscle: 'pull' },
+    { id: 'legs2',  label: { en: 'Legs B',  es: 'Piernas B' }, muscle: 'legs' },
+    { id: 'cardio', label: { en: 'Cardio & conditioning', es: 'Cardio y acondicionamiento' }, muscle: 'cardio', cardio: true },
+  ],
+};
+
+// Cardio prescriptions vary with goal — we surface 3 options the user can pick
+// from on the day. They are deliberately concrete (km / minutes / intervals)
+// rather than vague.
+const CARDIO_OPTIONS = {
+  fatloss: [
+    { id: 'liss', mode: 'run',  label: { en: 'Steady run · 5–7 km @ Zone 2', es: 'Trote continuo · 5–7 km en Zona 2' }, minutes: 45 },
+    { id: 'hiit', mode: 'hiit', label: { en: 'HIIT · 10×(45s sprint / 75s walk)', es: 'HIIT · 10×(45s sprint / 75s caminar)' }, minutes: 25 },
+    { id: 'mix',  mode: 'mix',  label: { en: '20 min row + 20 min incline walk', es: '20 min remo + 20 min caminata inclinada' }, minutes: 40 },
+  ],
+  endurance: [
+    { id: 'tempo', mode: 'run',  label: { en: 'Tempo run · 6 km moderate', es: 'Trote tempo · 6 km moderado' }, minutes: 35 },
+    { id: 'long',  mode: 'run',  label: { en: 'Long run · 8–10 km easy pace', es: 'Trote largo · 8–10 km ritmo fácil' }, minutes: 60 },
+    { id: 'bike',  mode: 'bike', label: { en: 'Bike · 25 km steady', es: 'Bici · 25 km ritmo constante' }, minutes: 60 },
+  ],
+  hypertrophy: [
+    { id: 'easy', mode: 'walk', label: { en: 'Incline walk · 30–40 min', es: 'Caminata inclinada · 30–40 min' }, minutes: 35 },
+    { id: 'jog',  mode: 'run',  label: { en: 'Easy jog · 4 km', es: 'Trote suave · 4 km' }, minutes: 25 },
+    { id: 'row',  mode: 'row',  label: { en: 'Row · 15 min + mobility 10 min', es: 'Remo · 15 min + movilidad 10 min' }, minutes: 25 },
+  ],
+  strength: [
+    { id: 'easy', mode: 'walk', label: { en: 'Incline walk · 30 min', es: 'Caminata inclinada · 30 min' }, minutes: 30 },
+    { id: 'sled', mode: 'mix',  label: { en: 'Sled push 6×40 m + farmer carry 4×40 m', es: 'Empuje de trineo 6×40 m + farmer carry 4×40 m' }, minutes: 25 },
+    { id: 'row',  mode: 'row',  label: { en: 'Row · 2 km easy', es: 'Remo · 2 km suave' }, minutes: 15 },
+  ],
+  general: [
+    { id: 'run',  mode: 'run',  label: { en: 'Jog · 3–5 km', es: 'Trote · 3–5 km' }, minutes: 30 },
+    { id: 'walk', mode: 'walk', label: { en: 'Brisk walk · 45 min', es: 'Caminata rápida · 45 min' }, minutes: 45 },
+    { id: 'mix',  mode: 'mix',  label: { en: 'Bike 15 min + row 15 min + stretch 10 min', es: 'Bici 15 + remo 15 + estiramiento 10' }, minutes: 40 },
+  ],
+  mobility: [
+    { id: 'walk',   mode: 'walk', label: { en: 'Easy walk · 30 min outdoors', es: 'Caminata suave · 30 min al aire libre' }, minutes: 30 },
+    { id: 'yoga',   mode: 'yoga', label: { en: 'Yoga flow · 30 min', es: 'Flujo de yoga · 30 min' }, minutes: 30 },
+    { id: 'mobile', mode: 'mob',  label: { en: 'Full-body mobility circuit · 25 min', es: 'Circuito de movilidad cuerpo completo · 25 min' }, minutes: 25 },
+  ],
 };
 
 const BRO_SPLIT = [
@@ -583,11 +691,15 @@ const BRO_SPLIT = [
 ];
 
 export function buildSplit(daysPerWeek, level = 'balanced', goal = 'general') {
-  const days = Math.max(2, Math.min(6, Number(daysPerWeek) || 3));
+  const days = Math.max(2, Math.min(7, Number(daysPerWeek) || 3));
   if (days === 5 && level === 'gym_rat' && goal === 'hypertrophy') {
     return BRO_SPLIT.map((d) => ({ ...d }));
   }
   return (SPLITS[days] || SPLITS[3]).map((d) => ({ ...d }));
+}
+
+export function getCardioOptions(goal) {
+  return (CARDIO_OPTIONS[goal] || CARDIO_OPTIONS.general).map((o) => ({ ...o }));
 }
 
 export function generateWeeklyRoutine(rawRequest, exercises, conditionKeys = []) {
@@ -599,10 +711,22 @@ export function generateWeeklyRoutine(rawRequest, exercises, conditionKeys = [])
     sex: rawRequest.sex,
     age: rawRequest.age,
   });
-  const daysPerWeek = Math.max(2, Math.min(6, Number(rawRequest.daysPerWeek) || 3));
+  const daysPerWeek = Math.max(2, Math.min(7, Number(rawRequest.daysPerWeek) || 3));
   const split = buildSplit(daysPerWeek, request.level, request.goal);
 
   const days = split.map((slot) => {
+    // CARDIO DAY — generated separately, not muscle-based.
+    if (slot.cardio) {
+      return {
+        id: slot.id,
+        label: slot.label,
+        muscle: 'cardio',
+        cardio: true,
+        cardioOptions: getCardioOptions(request.goal),
+        routine: { exercises: [], cardio: true, conditionKeys, request, empty: false },
+      };
+    }
+
     let dayMuscle = slot.muscle;
     let exerciseCount = request.exerciseCount;
 

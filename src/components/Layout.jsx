@@ -6,8 +6,10 @@ import { useDisclaimer } from '../hooks/useDisclaimer.jsx';
 
 const NAV_ITEMS = [
   { to: '/builder', key: 'builder', icon: BuilderIcon },
-  { to: '/saved', key: 'saved', icon: BookmarkIcon },
+  { to: '/experts', key: 'experts', icon: ExpertsIcon },
+  { to: '/diet', key: 'diet', icon: DietIcon },
   { to: '/progress', key: 'progress', icon: ChartIcon },
+  { to: '/saved', key: 'saved', icon: BookmarkIcon },
   { to: '/account', key: 'account', icon: UserIcon },
 ];
 
@@ -54,8 +56,8 @@ export function Layout() {
         <Outlet />
       </main>
 
-      <nav className="safe-bottom fixed bottom-0 left-1/2 z-40 w-full max-w-md -translate-x-1/2 px-3 pb-2 pt-1">
-        <div className="flex items-center justify-around rounded-3xl border border-white/10 bg-ink-900/85 px-2 py-1.5 shadow-2xl backdrop-blur-xl">
+      <nav className="safe-bottom fixed bottom-0 left-1/2 z-40 w-full max-w-md -translate-x-1/2 px-2 pb-2 pt-1">
+        <div className="flex items-center justify-around rounded-3xl border border-white/10 bg-ink-900/85 px-1 py-1.5 shadow-2xl backdrop-blur-xl">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             return (
@@ -63,7 +65,7 @@ export function Layout() {
                 key={item.to}
                 to={item.to}
                 className={({ isActive }) =>
-                  `relative flex min-w-[64px] flex-col items-center gap-1 rounded-2xl px-3 py-2 font-display text-[10px] uppercase tracking-wider transition-all ${
+                  `relative flex flex-1 flex-col items-center gap-0.5 rounded-2xl px-1 py-2 font-display text-[9px] uppercase tracking-wider transition-all ${
                     isActive
                       ? 'bg-neon-500/15 text-neon-300'
                       : 'text-neutral-400 hover:text-neutral-200'
@@ -123,6 +125,24 @@ function UserIcon({ className }) {
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <circle cx="12" cy="8" r="4" />
       <path d="M4 21a8 8 0 0 1 16 0" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ExpertsIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 2 4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-4z" strokeLinejoin="round" />
+      <path d="m9 12 2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function DietIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 4c-3 0-5 2.5-5 5 0 3 5 11 5 11s5-8 5-11c0-2.5-2-5-5-5z" strokeLinejoin="round" />
+      <circle cx="12" cy="9" r="1" fill="currentColor" />
     </svg>
   );
 }

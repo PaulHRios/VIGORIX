@@ -8,6 +8,8 @@ export const translations = {
 
     nav: {
       builder: 'Builder',
+      experts: 'Experts',
+      diet: 'Diet',
       saved: 'Saved',
       progress: 'Progress',
       account: 'Account',
@@ -42,7 +44,7 @@ export const translations = {
 
     onboarding: {
       welcome: 'Welcome to VIGORIX',
-      sub: 'Answer 5 quick questions to get a routine built for you.',
+      sub: 'Answer a few quick questions to get a routine built for you.',
       step: 'Step',
       of: 'of',
 
@@ -57,6 +59,12 @@ export const translations = {
       agePlaceholder: 'Age',
       ageHint: 'Used to adjust intensity, never shared.',
       ageError: 'Please enter a valid age (10-99).',
+
+      heightQ: 'How tall are you?',
+      heightPlaceholderCm: '170',
+      heightPlaceholderIn: '68',
+      heightHint: 'Used to compute BMI and body-fat estimates.',
+      heightError: 'Please enter a valid height.',
 
       goalQ: 'What is your main goal?',
       goals: {
@@ -111,7 +119,7 @@ export const translations = {
       },
       typeHint: {
         single: 'One workout for right now.',
-        weekly: 'A 2–6 day split for the whole week.',
+        weekly: 'A 2–7 day split for the whole week.',
       },
 
       // Single-day builder
@@ -129,6 +137,8 @@ export const translations = {
 
       profileSummary: 'Your profile',
       editProfile: 'Edit profile',
+      sevenDayHint:
+        '7-day plans are extra-aggressive. We add a dedicated cardio / conditioning day to keep volume sustainable. Recommended only for advanced trainees — listen to your body and rest if you need to.',
     },
 
     loading: {
@@ -170,6 +180,7 @@ export const translations = {
         hamstrings: 'Hamstrings',
         calves: 'Calves',
         abdominals: 'Abs',
+        abs: 'Abs',
       },
 
       equipmentOptions: {
@@ -210,6 +221,7 @@ export const translations = {
 
       techniques: {
         straight: 'Straight sets',
+        biset: 'Bi-set',
         superset: 'Superset',
         triset: 'Tri-set',
         dropset: 'Drop set',
@@ -242,6 +254,15 @@ export const translations = {
       addBodyWeight: 'Log body weight',
       recentLogs: 'Recent sets',
       bodyWeightHistory: 'Body weight history',
+      bmi: 'BMI',
+      bodyFat: 'Body fat',
+      idealRange: 'Healthy weight range',
+      needHeightForBmi: 'Add your height in your profile to see BMI and body-fat estimates.',
+      searchPlaceholder: 'Search exercises (e.g. squat, curl)…',
+      matches: 'matches',
+      noMatches: 'No previous logs match your search.',
+      lastTime: 'Last time',
+      fullHistory: 'See history',
     },
 
     auth: {
@@ -270,12 +291,70 @@ export const translations = {
       revisit: 'View disclaimer',
     },
 
+    diet: {
+      title: 'Diet generator',
+      sub: 'A 7-day meal plan tailored to your goal, body, and training. Swap any meal you don\'t love.',
+      goal: 'Goal',
+      weight: 'Weight',
+      height: 'Height',
+      generate: 'Generate weekly plan',
+      cooking: 'Plating your week…',
+      weekTitle: 'Your weekly plan',
+      protein: 'protein',
+      swap: 'Swap',
+      regenDay: 'Regenerate this day',
+      regenAll: 'Regenerate full week',
+      savePlan: 'Save plan',
+      savedPrefix: 'Diet plan',
+      dietaryQ: 'Any dietary preference?',
+      dietaryTags: {
+        any: 'No preference',
+        vegetarian: 'Vegetarian',
+        vegan: 'Vegan',
+        no_cook: 'No-cook (busy)',
+      },
+      weightFromEstimate:
+        'No body-weight log yet — using a healthy-BMI estimate. Log your real weight in Progress for a more accurate plan.',
+      supplements: 'Protein & creatine guidance',
+      supplementsSub: 'General recommendations for healthy adults. Talk to your doctor if you have kidney issues or take medication.',
+      creatine: 'Creatine monohydrate',
+      disclaimer:
+        'This plan is informational. It does not replace a registered dietitian, especially if you have allergies, diabetes, or other medical conditions.',
+    },
+
+    experts: {
+      title: 'Expert routines',
+      sub: 'Curated programs from coaches with real track records — Nippard, Yates, Contreras, Wendler, Rippetoe and more.',
+      byMuscle: 'By muscle',
+      bySchedule: 'By schedule',
+      pickMuscle: 'Pick a muscle group',
+      pickSchedule: 'How many days per week?',
+      saveRoutine: 'Save to my routines',
+      savedPrefix: 'Expert',
+      watch: 'Watch',
+      noResults: 'No expert routines match your level/goal. Try adjusting your profile.',
+      disclaimer:
+        'These templates are inspired by published programs from well-known coaches and adapted to our format. Always warm up properly, scale weights to your level, and stop if anything hurts.',
+    },
+
     weekly: {
       title: 'Weekly plan',
       day: 'Day',
       rest: 'Rest day',
       generated: 'Your weekly plan',
       summary: 'Plan summary',
+      cardioIntro: 'Pick one of these conditioning sessions. Hit Zone 2 or HIIT depending on how you feel — never both back to back.',
+      cardioTip: 'Tip: warm up 5 min, finish with 5 min of mobility. Stay hydrated. If your heart rate is still elevated 2 min after stopping, keep walking.',
+      cardioModes: {
+        run: 'Run',
+        walk: 'Walk',
+        hiit: 'HIIT',
+        bike: 'Bike',
+        row: 'Row',
+        yoga: 'Yoga',
+        mob: 'Mobility',
+        mix: 'Circuit',
+      },
     },
 
     errors: {
@@ -323,7 +402,7 @@ export const translations = {
 
     onboarding: {
       welcome: 'Bienvenido a VIGORIX',
-      sub: 'Responde 5 preguntas rápidas para armar tu rutina.',
+      sub: 'Responde unas preguntas rápidas para armar tu rutina.',
       step: 'Paso',
       of: 'de',
 
@@ -338,6 +417,12 @@ export const translations = {
       agePlaceholder: 'Edad',
       ageHint: 'Se usa para ajustar la intensidad. Nunca se comparte.',
       ageError: 'Ingresa una edad válida (10-99).',
+
+      heightQ: '¿Cuánto mides?',
+      heightPlaceholderCm: '170',
+      heightPlaceholderIn: '68',
+      heightHint: 'Se usa para calcular IMC y porcentaje de grasa.',
+      heightError: 'Ingresa una estatura válida.',
 
       goalQ: '¿Cuál es tu objetivo principal?',
       goals: {
@@ -392,7 +477,7 @@ export const translations = {
       },
       typeHint: {
         single: 'Un entreno para hoy.',
-        weekly: 'División de 2 a 6 días para toda la semana.',
+        weekly: 'División de 2 a 7 días para toda la semana.',
       },
 
       singleTitle: 'Rutina del día',
@@ -408,6 +493,8 @@ export const translations = {
 
       profileSummary: 'Tu perfil',
       editProfile: 'Editar perfil',
+      sevenDayHint:
+        'Los planes de 7 días son agresivos. Añadimos un día dedicado a cardio / acondicionamiento para sostener el volumen. Recomendado sólo para avanzados — escucha a tu cuerpo y descansa si lo necesitas.',
     },
 
     loading: {
@@ -449,6 +536,7 @@ export const translations = {
         hamstrings: 'Isquios',
         calves: 'Pantorrillas',
         abdominals: 'Abdominales',
+        abs: 'Abdominales',
       },
 
       equipmentOptions: {
@@ -489,7 +577,8 @@ export const translations = {
 
       techniques: {
         straight: 'Series rectas',
-        superset: 'Bi-serie',
+        biset: 'Bi-serie',
+        superset: 'Súper-serie',
         triset: 'Tri-serie',
         dropset: 'Drop set',
       },
@@ -521,6 +610,15 @@ export const translations = {
       addBodyWeight: 'Registrar peso corporal',
       recentLogs: 'Series recientes',
       bodyWeightHistory: 'Historial de peso corporal',
+      bmi: 'IMC',
+      bodyFat: '% Grasa',
+      idealRange: 'Rango saludable',
+      needHeightForBmi: 'Añade tu altura en el perfil para ver el IMC y el % de grasa.',
+      searchPlaceholder: 'Buscar ejercicio (ej. sentadilla, curl)…',
+      matches: 'coincidencias',
+      noMatches: 'Ningún ejercicio anterior coincide con tu búsqueda.',
+      lastTime: 'Última vez',
+      fullHistory: 'Ver historial',
     },
 
     auth: {
@@ -549,12 +647,70 @@ export const translations = {
       revisit: 'Ver aviso legal',
     },
 
+    diet: {
+      title: 'Generador de dieta',
+      sub: 'Plan de comidas de 7 días según tu objetivo, cuerpo y entrenamiento. Cambia cualquier comida que no te guste.',
+      goal: 'Objetivo',
+      weight: 'Peso',
+      height: 'Altura',
+      generate: 'Generar plan semanal',
+      cooking: 'Cocinando tu semana…',
+      weekTitle: 'Tu plan semanal',
+      protein: 'proteína',
+      swap: 'Cambiar',
+      regenDay: 'Regenerar este día',
+      regenAll: 'Regenerar semana completa',
+      savePlan: 'Guardar plan',
+      savedPrefix: 'Plan dieta',
+      dietaryQ: '¿Alguna preferencia alimentaria?',
+      dietaryTags: {
+        any: 'Sin preferencia',
+        vegetarian: 'Vegetariano',
+        vegan: 'Vegano',
+        no_cook: 'Sin cocinar (ocupado)',
+      },
+      weightFromEstimate:
+        'Aún no has registrado tu peso — usamos una estimación según IMC saludable. Registra tu peso real en Progreso para un plan más preciso.',
+      supplements: 'Guía de proteína y creatina',
+      supplementsSub: 'Recomendaciones generales para adultos sanos. Habla con tu médico si tienes problemas renales o tomas medicación.',
+      creatine: 'Creatina monohidrato',
+      disclaimer:
+        'Este plan es informativo. No reemplaza a un nutricionista titulado, especialmente si tienes alergias, diabetes u otras condiciones médicas.',
+    },
+
+    experts: {
+      title: 'Rutinas de expertos',
+      sub: 'Programas seleccionados de entrenadores con trayectoria real — Nippard, Yates, Contreras, Wendler, Rippetoe y más.',
+      byMuscle: 'Por músculo',
+      bySchedule: 'Por días',
+      pickMuscle: 'Elige un grupo muscular',
+      pickSchedule: '¿Cuántos días por semana?',
+      saveRoutine: 'Guardar en mis rutinas',
+      savedPrefix: 'Experto',
+      watch: 'Ver',
+      noResults: 'No hay rutinas de expertos para tu nivel/objetivo. Ajusta tu perfil.',
+      disclaimer:
+        'Estas plantillas están inspiradas en programas publicados de entrenadores reconocidos y adaptadas a nuestro formato. Calienta bien, ajusta el peso a tu nivel y detente si algo duele.',
+    },
+
     weekly: {
       title: 'Plan semanal',
       day: 'Día',
       rest: 'Día de descanso',
       generated: 'Tu plan semanal',
       summary: 'Resumen del plan',
+      cardioIntro: 'Elige una de estas sesiones de acondicionamiento. Z2 o HIIT según cómo te sientas — nunca las dos seguidas.',
+      cardioTip: 'Consejo: calienta 5 min y termina con 5 min de movilidad. Hidrátate. Si 2 min después de parar tu pulso sigue alto, sigue caminando.',
+      cardioModes: {
+        run: 'Trote',
+        walk: 'Caminata',
+        hiit: 'HIIT',
+        bike: 'Bicicleta',
+        row: 'Remo',
+        yoga: 'Yoga',
+        mob: 'Movilidad',
+        mix: 'Circuito',
+      },
     },
 
     errors: {

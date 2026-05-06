@@ -9,7 +9,7 @@ import { useLanguage } from '../hooks/useLanguage.jsx';
 import { completeOnboarding, ageWarnings } from '../services/userProfile.js';
 import { detectConditions } from '../data/conditions.js';
 
-const STEPS = ['sex', 'age', 'goal', 'level', 'equipment', 'condition'];
+const STEPS = ['sex', 'age', 'height', 'goal', 'level', 'equipment', 'condition'];
 
 const SEX_OPTIONS = ['male', 'female', 'other'];
 const GOAL_OPTIONS = ['hypertrophy', 'fatloss', 'strength', 'endurance', 'general', 'mobility'];
@@ -33,6 +33,8 @@ export function OnboardingPage() {
   const [answers, setAnswers] = useState({
     sex: null,
     age: '',
+    height: '',
+    heightUnit: 'cm',
     goal: null,
     level: null,
     equipment: [],
@@ -49,6 +51,12 @@ export function OnboardingPage() {
       case 'age': {
         const a = Number(answers.age);
         return Number.isFinite(a) && a >= 10 && a <= 99;
+      }
+      case 'height': {
+        const h = Number(answers.height);
+        if (!Number.isFinite(h) || h <= 0) return false;
+        if (answers.heightUnit === 'in') return h >= 39 && h <= 90; // ~ 1.0m–2.3m
+        return h >= 100 && h <= 230;
       }
       case 'goal':
         return Boolean(answers.goal);
@@ -93,9 +101,15 @@ export function OnboardingPage() {
 
   function finish() {
     const conditionKeys = answers.condition ? detectConditions(answers.condition) : [];
+    const heightCm =
+      answers.heightUnit === 'in'
+        ? Math.round(Number(answers.height) * 2.54)
+        : Math.round(Number(answers.height));
     completeOnboarding({
       sex: answers.sex,
       age: Number(answers.age),
+      height: heightCm,
+      heightUnit: 'cm',
       goal: answers.goal,
       level: answers.level,
       equipment: answers.equipment,
@@ -175,6 +189,45 @@ export function OnboardingPage() {
               <p className="mt-3 rounded-2xl border border-warn-amber/30 bg-warn-amber/10 p-3 text-xs text-warn-amber">
                 {ageWarn.message}
               </p>
+            )}
+          </Step>
+        )}
+
+        {step === 'height' && (
+          <Step title={t.onboarding.heightQ} hint={t.onboarding.heightHint}>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                inputMode="decimal"
+                min={answers.heightUnit === 'in' ? '39' : '100'}
+                max={answers.heightUnit === 'in' ? '90' : '230'}
+                autoFocus
+                value={answers.height}
+                onChange={(e) => update({ height: e.target.value })}
+                placeholder={
+                  answers.heightUnit === 'in' ? t.onboarding.heightPlaceholderIn : t.onboarding.heightPlaceholderCm
+                }
+                className="input flex-1 text-center font-display text-3xl"
+              />
+              <div className="flex overflow-hidden rounded-2xl border border-white/10">
+                {['cm', 'in'].map((u) => (
+                  <button
+                    key={u}
+                    type="button"
+                    onClick={() => update({ heightUnit: u })}
+                    className={`px-4 font-display text-sm uppercase tracking-wider transition-colors ${
+                      answers.heightUnit === u
+                        ? 'bg-neon-500/20 text-neon-200'
+                        : 'bg-white/[0.02] text-neutral-400 hover:bg-white/[0.05]'
+                    }`}
+                  >
+                    {u}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {answers.height && !canAdvance && (
+              <p className="mt-2 text-sm text-warn-red">{t.onboarding.heightError}</p>
             )}
           </Step>
         )}

@@ -4,6 +4,8 @@ import { useEffect } from 'react';
 import { Layout } from './components/Layout.jsx';
 import { OnboardingPage } from './pages/OnboardingPage.jsx';
 import { BuilderPage } from './pages/BuilderPage.jsx';
+import { ExpertsPage } from './pages/ExpertsPage.jsx';
+import { DietPage } from './pages/DietPage.jsx';
 import { SavedPage } from './pages/SavedPage.jsx';
 import { ProgressPage } from './pages/ProgressPage.jsx';
 import { AccountPage } from './pages/AccountPage.jsx';
@@ -27,6 +29,8 @@ export default function App() {
               <Route path="/" element={<Layout />}>
                 <Route index element={<HomeRedirect />} />
                 <Route path="builder" element={<BuilderPage />} />
+                <Route path="experts" element={<ExpertsPage />} />
+                <Route path="diet" element={<DietPage />} />
                 <Route path="saved" element={<SavedPage />} />
                 <Route path="progress" element={<ProgressPage />} />
                 <Route path="account" element={<AccountPage />} />
