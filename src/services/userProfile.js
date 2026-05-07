@@ -15,8 +15,14 @@ const DEFAULT_PROFILE = {
   goal: null, // 'strength' | 'hypertrophy' | 'endurance' | 'fatloss' | 'mobility' | 'general'
   level: null, // 'beginner' | 'balanced' | 'advanced' | 'gym_rat'
   equipment: [], // array of equipment keys
-  conditionKeys: [], // detected condition keys
-  conditionText: '', // raw text the user typed (optional)
+
+  // Health flags collected by the structured condition steps
+  pregnancy: 'none', // 'none' | 't1' | 't2' | 't3' | 'postpartum'
+  mobility: 'full', // 'full' | 'mild' | 'severe'
+  avoidAreas: [], // body areas/joints the user wants to spare: ['knee', 'lower_back', ...]
+
+  conditionKeys: [], // derived condition keys (incl. pregnancy, senior, mobility_limit, etc.)
+  conditionText: '', // free-text notes from the optional last step
   completedAt: null, // ISO date when onboarding finished
 };
 

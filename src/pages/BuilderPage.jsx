@@ -103,6 +103,11 @@ export function BuilderPage() {
     return buildSplit(daysPerWeek, profile.level, profile.goal);
   }, [daysPerWeek, profile.level, profile.goal]);
 
+  const generatorOptions = useMemo(
+    () => ({ avoidAreas: profile.avoidAreas || [] }),
+    [profile.avoidAreas],
+  );
+
   async function handleGenerateSingle() {
     setBusy(true);
     setRoutine(null);
@@ -120,6 +125,7 @@ export function BuilderPage() {
       },
       pool,
       profile.conditionKeys || [],
+      generatorOptions,
     );
     setRoutine(result);
     setBusy(false);
@@ -141,6 +147,7 @@ export function BuilderPage() {
       },
       pool,
       profile.conditionKeys || [],
+      generatorOptions,
     );
     setWeekly(result);
     setBusy(false);
@@ -148,7 +155,7 @@ export function BuilderPage() {
 
   function handleReplace(index) {
     if (!routine) return;
-    const next = replaceExercise(routine, index, pool, profile.conditionKeys || []);
+    const next = replaceExercise(routine, index, pool, profile.conditionKeys || [], generatorOptions);
     if (next) setRoutine(next);
   }
 
@@ -161,6 +168,7 @@ export function BuilderPage() {
       exerciseIndex,
       pool,
       profile.conditionKeys || [],
+      generatorOptions,
     );
     if (!updated) return;
     setWeekly((prev) => ({

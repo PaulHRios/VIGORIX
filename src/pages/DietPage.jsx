@@ -15,6 +15,7 @@ import {
   getProfile,
   isOnboarded,
   computeBmi,
+  computeCalorieTarget,
   toKg,
 } from '../services/userProfile.js';
 import { listBodyMetrics } from '../services/storageService.js';
@@ -56,6 +57,8 @@ export function DietPage() {
   const [weightKg, setWeightKg] = useState(null);
   const [plan, setPlan] = useState(null);
   const [dietaryTag, setDietaryTag] = useState(null);
+  const [mealPrep, setMealPrep] = useState(false);
+  const [customKcal, setCustomKcal] = useState(null); // null = use suggested
   const [busy, setBusy] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [openDay, setOpenDay] = useState(0);
@@ -84,11 +87,33 @@ export function DietPage() {
     return Math.round(22.5 * m * m);
   }
 
+  // Suggested kcal for the current profile (drives the kcal slider).
+  const suggestedKcal = useMemo(() => {
+    const w = weightKg || estimatedWeight(profile);
+    const t = computeCalorieTarget({
+      weightKg: w,
+      heightCm: profile.height,
+      age: profile.age,
+      sex: profile.sex,
+      goal: profile.goal,
+      level: profile.level,
+    });
+    return t?.kcal || 2000;
+  }, [profile, weightKg]);
+
+  const effectiveKcal = customKcal ?? suggestedKcal;
+  const kcalIsLow = effectiveKcal < (profile.sex === 'female' ? 1500 : 1700);
+
   function handleGenerate() {
     setBusy(true);
     setTimeout(() => {
       const w = weightKg || estimatedWeight(profile);
-      const next = generateDietPlan(profile, { weightKg: w, dietaryTag });
+      const next = generateDietPlan(profile, {
+        weightKg: w,
+        dietaryTag,
+        mealPrep,
+        customKcal: customKcal ?? undefined,
+      });
       setPlan(next);
       setBusy(false);
       setOpenDay(0);
@@ -165,6 +190,86 @@ export function DietPage() {
           </div>
         </div>
 
+        <div className="card p-4">
+          <div className="font-display text-xs uppercase tracking-wider text-neutral-400">
+            {t.diet.mealPrepQ}
+          </div>
+          <p className="mt-1 text-[11px] text-neutral-500">{t.diet.mealPrepHint}</p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setMealPrep(false)}
+              className={`rounded-2xl border px-3 py-2.5 text-sm transition-colors ${
+                !mealPrep
+                  ? 'border-neon-500 bg-neon-500/10 text-neon-200'
+                  : 'border-white/10 bg-white/[0.03] text-neutral-300 hover:bg-white/[0.06]'
+              }`}
+            >
+              {t.diet.mealPrepOptions.rotate}
+            </button>
+            <button
+              onClick={() => setMealPrep(true)}
+              className={`rounded-2xl border px-3 py-2.5 text-sm transition-colors ${
+                mealPrep
+                  ? 'border-neon-500 bg-neon-500/10 text-neon-200'
+                  : 'border-white/10 bg-white/[0.03] text-neutral-300 hover:bg-white/[0.06]'
+              }`}
+            >
+              {t.diet.mealPrepOptions.prep}
+            </button>
+          </div>
+        </div>
+
+        <div className="card p-4">
+          <div className="flex items-baseline justify-between">
+            <div className="font-display text-xs uppercase tracking-wider text-neutral-400">
+              {t.diet.kcalQ}
+            </div>
+            <div className="font-mono text-[11px] text-neutral-500">
+              {t.diet.kcalSuggested}: <span className="text-neon-300">{suggestedKcal}</span>
+            </div>
+          </div>
+          <p className="mt-1 text-[11px] text-neutral-500">{t.diet.kcalHint}</p>
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="number"
+              inputMode="numeric"
+              min="1000"
+              max="5000"
+              step="50"
+              value={effectiveKcal}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                setCustomKcal(Number.isFinite(n) && n > 0 ? Math.round(n) : null);
+              }}
+              className="input flex-1 text-center font-display text-xl"
+            />
+            <span className="font-mono text-xs text-neutral-500">kcal</span>
+          </div>
+          <input
+            type="range"
+            min="1200"
+            max="4000"
+            step="50"
+            value={effectiveKcal}
+            onChange={(e) => setCustomKcal(Number(e.target.value))}
+            className="mt-2 w-full accent-neon-500"
+          />
+          {customKcal !== null && customKcal !== suggestedKcal && (
+            <button
+              onClick={() => setCustomKcal(null)}
+              className="mt-1 text-[11px] text-neutral-400 hover:text-neon-300"
+            >
+              ↺ {t.diet.kcalReset}
+            </button>
+          )}
+          {kcalIsLow && (
+            <p className="mt-2 rounded-2xl border border-warn-amber/30 bg-warn-amber/10 p-2.5 text-[11px] text-warn-amber">
+              ⚠ {t.diet.kcalWarnLow}
+            </p>
+          )}
+          <p className="mt-2 text-[11px] text-neutral-500">{t.diet.proteinFloorNote}</p>
+        </div>
+
         <button onClick={handleGenerate} className="btn-primary w-full">
           {t.diet.generate}
         </button>
@@ -199,6 +304,11 @@ export function DietPage() {
         <p className="text-sm text-neutral-400">
           {t.onboarding.goals[plan.goal]} · {plan.targets.kcal} kcal · {plan.macros.protein} g {t.diet.protein}
         </p>
+        {plan.mealPrep && (
+          <div className="mt-1 inline-flex items-center gap-1 rounded-full border border-neon-500/30 bg-neon-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-neon-300">
+            🥡 {t.diet.mealPrepBadge}
+          </div>
+        )}
       </header>
 
       <div className="card p-4">

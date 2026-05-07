@@ -98,8 +98,35 @@ function buildDay({ kcal, dayKey, dietaryTag }) {
   return { dayKey, meals, totals };
 }
 
+/**
+ * Recompute macros while honoring a user-supplied kcal override.
+ * Protein stays at the goal-based g/kg floor; if the kcal target leaves room,
+ * fat hits its standard share and carbs fill the rest. If kcal is so low that
+ * protein alone exceeds it, we keep protein and zero out carbs/fat — the user
+ * was warned in the UI.
+ */
+function macrosWithProteinFloor({ kcal, weightKg, goal }) {
+  const w = Number(weightKg);
+  const c = Number(kcal);
+  if (!Number.isFinite(c) || c <= 0) return null;
+  const proteinPerKg =
+    goal === 'fatloss' ? 2.2 :
+    goal === 'hypertrophy' || goal === 'strength' ? 2.0 :
+    1.6;
+  const protein = Math.round((Number.isFinite(w) ? w : 70) * proteinPerKg);
+  const fatPct = goal === 'fatloss' ? 0.27 : goal === 'hypertrophy' ? 0.25 : 0.28;
+  const proteinKcal = protein * 4;
+  const remaining = c - proteinKcal;
+  if (remaining <= 0) {
+    return { protein, fat: 0, carbs: 0, proteinPerKg };
+  }
+  const fat = Math.round((c * fatPct) / 9);
+  const carbs = Math.max(0, Math.round((c - protein * 4 - fat * 9) / 4));
+  return { protein, fat, carbs, proteinPerKg };
+}
+
 export function generateDietPlan(profile, options = {}) {
-  const targets = computeCalorieTarget({
+  const baseTargets = computeCalorieTarget({
     weightKg: options.weightKg,
     heightCm: profile.height,
     age: profile.age,
@@ -107,13 +134,33 @@ export function generateDietPlan(profile, options = {}) {
     goal: profile.goal,
     level: profile.level,
   });
-  if (!targets) return null;
+  if (!baseTargets) return null;
 
-  const macros = computeMacros({ kcal: targets.kcal, weightKg: options.weightKg, goal: profile.goal });
+  // Allow the user to override the daily kcal target.
+  const customKcal = Number(options.customKcal);
+  const finalKcal = Number.isFinite(customKcal) && customKcal > 0
+    ? Math.round(customKcal)
+    : baseTargets.kcal;
+  const targets = { ...baseTargets, kcal: finalKcal, suggestedKcal: baseTargets.kcal };
 
-  const days = DAY_KEYS.map((dayKey) =>
-    buildDay({ kcal: targets.kcal, dayKey, dietaryTag: options.dietaryTag }),
-  );
+  const macros = options.customKcal
+    ? macrosWithProteinFloor({ kcal: finalKcal, weightKg: options.weightKg, goal: profile.goal })
+    : computeMacros({ kcal: finalKcal, weightKg: options.weightKg, goal: profile.goal });
+
+  // Meal-prep mode: build a single day, then clone it 7 times.
+  const mealPrep = options.mealPrep === true;
+  let days;
+  if (mealPrep) {
+    const template = buildDay({ kcal: finalKcal, dayKey: 'mon', dietaryTag: options.dietaryTag });
+    days = DAY_KEYS.map((dayKey) => ({
+      ...JSON.parse(JSON.stringify(template)),
+      dayKey,
+    }));
+  } else {
+    days = DAY_KEYS.map((dayKey) =>
+      buildDay({ kcal: finalKcal, dayKey, dietaryTag: options.dietaryTag }),
+    );
+  }
 
   return {
     type: 'diet_plan',
@@ -125,7 +172,8 @@ export function generateDietPlan(profile, options = {}) {
     sex: profile.sex,
     level: profile.level,
     dietaryTag: options.dietaryTag || null,
-    targets, // { bmr, tdee, kcal }
+    mealPrep,
+    targets, // { bmr, tdee, kcal, suggestedKcal }
     macros, // { protein, carbs, fat }
     days,
   };
@@ -134,11 +182,17 @@ export function generateDietPlan(profile, options = {}) {
 export function regenerateDay(plan, dayIndex) {
   if (!plan || !plan.days?.[dayIndex]) return plan;
   const next = clone(plan);
-  next.days[dayIndex] = buildDay({
+  const fresh = buildDay({
     kcal: plan.targets.kcal,
     dayKey: plan.days[dayIndex].dayKey,
     dietaryTag: plan.dietaryTag,
   });
+  if (plan.mealPrep) {
+    // Same recipe all week → regenerating one day rewrites every day.
+    next.days = next.days.map((d) => ({ ...clone(fresh), dayKey: d.dayKey }));
+  } else {
+    next.days[dayIndex] = fresh;
+  }
   next.updatedAt = new Date().toISOString();
   return next;
 }
@@ -160,19 +214,34 @@ export function regenerateMeal(plan, dayIndex, mealIndex) {
   }[slots.length] || [0.33, 0.34, 0.33];
   const target = Math.round(plan.targets.kcal * splits[mealIndex]);
   const next = clone(plan);
-  next.days[dayIndex].meals[mealIndex] = pickMealForSlot(slot, target, used);
-  // Recompute day totals
-  const totals = next.days[dayIndex].meals.reduce(
-    (acc, m) => {
-      acc.kcal += m.kcal;
-      acc.protein += m.protein;
-      acc.carbs += m.carbs;
-      acc.fat += m.fat;
-      return acc;
-    },
-    { kcal: 0, protein: 0, carbs: 0, fat: 0 },
-  );
-  next.days[dayIndex].totals = totals;
+  const newMeal = pickMealForSlot(slot, target, used);
+
+  function recomputeTotals(day) {
+    return day.meals.reduce(
+      (acc, m) => {
+        acc.kcal += m.kcal;
+        acc.protein += m.protein;
+        acc.carbs += m.carbs;
+        acc.fat += m.fat;
+        return acc;
+      },
+      { kcal: 0, protein: 0, carbs: 0, fat: 0 },
+    );
+  }
+
+  if (plan.mealPrep) {
+    // Same recipe all week → swap that meal in every day.
+    next.days = next.days.map((d) => {
+      const meals = [...d.meals];
+      meals[mealIndex] = clone(newMeal);
+      const dayCopy = { ...d, meals };
+      dayCopy.totals = recomputeTotals(dayCopy);
+      return dayCopy;
+    });
+  } else {
+    next.days[dayIndex].meals[mealIndex] = newMeal;
+    next.days[dayIndex].totals = recomputeTotals(next.days[dayIndex]);
+  }
   next.updatedAt = new Date().toISOString();
   return next;
 }

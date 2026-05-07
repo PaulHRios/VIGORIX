@@ -15,7 +15,7 @@
 // which means every exercise that flows through the aggregator is already
 // tagged with main_muscle / sub_muscle / exercise_type, etc.
 
-import { getAvoidTags, getIntensityModifier } from '../data/conditions.js';
+import { getAvoidTags, getIntensityModifier, tagsForAvoidAreas } from '../data/conditions.js';
 import { classifyExercise } from '../data/subgroupClassifier.js';
 
 // =================================================================
@@ -463,9 +463,13 @@ function areAntagonists(mainA, mainB) {
 // PUBLIC: GENERATE
 // =================================================================
 
-export function generateRoutine(rawRequest, exercises, conditionKeys = []) {
+export function generateRoutine(rawRequest, exercises, conditionKeys = [], options = {}) {
   const request = normalizeRequest(rawRequest);
   const avoidTags = getAvoidTags(conditionKeys);
+  // Merge in tags from explicit body-area avoidances (knees, lower back, etc.)
+  if (Array.isArray(options.avoidAreas) && options.avoidAreas.length) {
+    tagsForAvoidAreas(options.avoidAreas).forEach((t) => avoidTags.add(t));
+  }
   const intensity = getIntensityModifier(conditionKeys);
   const profile = LEVEL_PROFILE[request.level] || LEVEL_PROFILE.balanced;
   const userLevelOrder = LEVEL_ORDER[
@@ -544,13 +548,16 @@ export function generateRoutine(rawRequest, exercises, conditionKeys = []) {
 // EXERCISE REPLACEMENT
 // =================================================================
 
-export function replaceExercise(routine, exerciseIndex, exercises, conditionKeys = []) {
+export function replaceExercise(routine, exerciseIndex, exercises, conditionKeys = [], options = {}) {
   if (!routine || !Array.isArray(routine.exercises)) return null;
   const current = routine.exercises[exerciseIndex];
   if (!current) return null;
 
   const request = routine.request || normalizeRequest({});
   const avoidTags = getAvoidTags(conditionKeys);
+  if (Array.isArray(options.avoidAreas) && options.avoidAreas.length) {
+    tagsForAvoidAreas(options.avoidAreas).forEach((t) => avoidTags.add(t));
+  }
   const intensity = getIntensityModifier(conditionKeys);
   const profile = LEVEL_PROFILE[request.level] || LEVEL_PROFILE.balanced;
   const userLevelOrder = LEVEL_ORDER[
@@ -702,7 +709,7 @@ export function getCardioOptions(goal) {
   return (CARDIO_OPTIONS[goal] || CARDIO_OPTIONS.general).map((o) => ({ ...o }));
 }
 
-export function generateWeeklyRoutine(rawRequest, exercises, conditionKeys = []) {
+export function generateWeeklyRoutine(rawRequest, exercises, conditionKeys = [], options = {}) {
   const request = normalizeRequest({
     goal: rawRequest.goal || 'general',
     level: rawRequest.level || 'balanced',
@@ -738,7 +745,7 @@ export function generateWeeklyRoutine(rawRequest, exercises, conditionKeys = [])
     }
 
     const dayRequest = { ...request, muscle: dayMuscle, exerciseCount };
-    const routine = generateRoutine(dayRequest, exercises, conditionKeys);
+    const routine = generateRoutine(dayRequest, exercises, conditionKeys, options);
     return { id: slot.id, label: slot.label, muscle: slot.muscle, routine };
   });
 

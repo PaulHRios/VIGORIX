@@ -1,15 +1,17 @@
 // src/pages/OnboardingPage.jsx
 //
-// 5-step guided onboarding. Saves answers to userProfile so the builder
-// can reuse them. No free text except the optional condition field at the end.
+// Guided onboarding. Saves answers to userProfile so the builder can reuse
+// them. The "condition" portion is now a series of structured questions:
+//   - pregnancy stage (only shown to potentially pregnant users)
+//   - mobility / effort capacity
+//   - body areas to avoid (multi-select chips)
+//   - free-text notes (optional, last)
 
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../hooks/useLanguage.jsx';
 import { completeOnboarding, ageWarnings } from '../services/userProfile.js';
-import { detectConditions } from '../data/conditions.js';
-
-const STEPS = ['sex', 'age', 'height', 'goal', 'level', 'equipment', 'condition'];
+import { detectConditions, deriveConditionKeysFromProfile } from '../data/conditions.js';
 
 const SEX_OPTIONS = ['male', 'female', 'other'];
 const GOAL_OPTIONS = ['hypertrophy', 'fatloss', 'strength', 'endurance', 'general', 'mobility'];
@@ -25,6 +27,28 @@ const EQUIPMENT_OPTIONS = [
   'exercise_ball',
 ];
 
+const PREGNANCY_OPTIONS = ['none', 't1', 't2', 't3', 'postpartum'];
+const MOBILITY_OPTIONS = ['full', 'mild', 'severe'];
+const AVOID_AREA_OPTIONS = [
+  'knee',
+  'lower_back',
+  'upper_back',
+  'shoulder',
+  'wrist',
+  'elbow',
+  'hip',
+  'ankle',
+  'chest',
+  'abdomen',
+];
+
+// Pregnancy step is only relevant to potentially pregnant users.
+function shouldAskPregnancy(answers) {
+  if (answers.sex !== 'female') return false;
+  const a = Number(answers.age);
+  return Number.isFinite(a) && a >= 14 && a <= 55;
+}
+
 export function OnboardingPage() {
   const { t, lang } = useLanguage();
   const navigate = useNavigate();
@@ -38,11 +62,22 @@ export function OnboardingPage() {
     goal: null,
     level: null,
     equipment: [],
-    condition: '',
+    pregnancy: 'none',
+    mobility: 'full',
+    avoidAreas: [],
+    notes: '',
   });
 
-  const step = STEPS[stepIndex];
-  const total = STEPS.length;
+  // Pregnancy step is conditional, so the active step list is computed.
+  const steps = useMemo(() => {
+    const list = ['sex', 'age', 'height', 'goal', 'level', 'equipment'];
+    if (shouldAskPregnancy(answers)) list.push('pregnancy');
+    list.push('mobility', 'avoid', 'notes');
+    return list;
+  }, [answers.sex, answers.age]);
+
+  const step = steps[stepIndex];
+  const total = steps.length;
 
   const canAdvance = useMemo(() => {
     switch (step) {
@@ -55,7 +90,7 @@ export function OnboardingPage() {
       case 'height': {
         const h = Number(answers.height);
         if (!Number.isFinite(h) || h <= 0) return false;
-        if (answers.heightUnit === 'in') return h >= 39 && h <= 90; // ~ 1.0m–2.3m
+        if (answers.heightUnit === 'in') return h >= 39 && h <= 90;
         return h >= 100 && h <= 230;
       }
       case 'goal':
@@ -64,7 +99,13 @@ export function OnboardingPage() {
         return Boolean(answers.level);
       case 'equipment':
         return Array.isArray(answers.equipment) && answers.equipment.length > 0;
-      case 'condition':
+      case 'pregnancy':
+        return Boolean(answers.pregnancy);
+      case 'mobility':
+        return Boolean(answers.mobility);
+      case 'avoid':
+        return true; // multi-select, none is valid
+      case 'notes':
         return true; // optional
       default:
         return false;
@@ -85,9 +126,19 @@ export function OnboardingPage() {
     });
   }
 
+  function toggleAvoidArea(key) {
+    setAnswers((prev) => {
+      const has = prev.avoidAreas.includes(key);
+      return {
+        ...prev,
+        avoidAreas: has ? prev.avoidAreas.filter((k) => k !== key) : [...prev.avoidAreas, key],
+      };
+    });
+  }
+
   function handleNext() {
     if (!canAdvance) return;
-    if (stepIndex < STEPS.length - 1) {
+    if (stepIndex < steps.length - 1) {
       setStepIndex((i) => i + 1);
       return;
     }
@@ -100,22 +151,34 @@ export function OnboardingPage() {
   }
 
   function finish() {
-    const conditionKeys = answers.condition ? detectConditions(answers.condition) : [];
     const heightCm =
       answers.heightUnit === 'in'
         ? Math.round(Number(answers.height) * 2.54)
         : Math.round(Number(answers.height));
-    completeOnboarding({
+
+    const ageNum = Number(answers.age);
+    // Build the structured profile + derived condition keys.
+    const baseProfile = {
       sex: answers.sex,
-      age: Number(answers.age),
+      age: ageNum,
       height: heightCm,
       heightUnit: 'cm',
       goal: answers.goal,
       level: answers.level,
       equipment: answers.equipment,
-      conditionText: answers.condition || '',
-      conditionKeys,
-    });
+      pregnancy: answers.pregnancy,
+      mobility: answers.mobility,
+      avoidAreas: answers.avoidAreas,
+      conditionText: answers.notes || '',
+    };
+
+    const conditionKeys = deriveConditionKeysFromProfile(baseProfile);
+    // Extra: detect from notes too (already covered by the helper, but kept
+    // explicit so we never lose an old keyword on edit).
+    const fromNotes = answers.notes ? detectConditions(answers.notes) : [];
+    const merged = Array.from(new Set([...conditionKeys, ...fromNotes]));
+
+    completeOnboarding({ ...baseProfile, conditionKeys: merged });
     navigate('/builder');
   }
 
@@ -285,13 +348,75 @@ export function OnboardingPage() {
           </Step>
         )}
 
-        {step === 'condition' && (
-          <Step title={t.onboarding.conditionQ}>
+        {step === 'pregnancy' && (
+          <Step title={t.onboarding.pregnancyQ} hint={t.onboarding.pregnancyHint}>
+            <div className="grid grid-cols-1 gap-2">
+              {PREGNANCY_OPTIONS.map((opt) => (
+                <BigChoice
+                  key={opt}
+                  active={answers.pregnancy === opt}
+                  onClick={() => update({ pregnancy: opt })}
+                  label={t.onboarding.pregnancyOptions[opt]}
+                />
+              ))}
+            </div>
+          </Step>
+        )}
+
+        {step === 'mobility' && (
+          <Step title={t.onboarding.mobilityQ} hint={t.onboarding.mobilityHint}>
+            <div className="grid grid-cols-1 gap-2">
+              {MOBILITY_OPTIONS.map((opt) => (
+                <BigChoice
+                  key={opt}
+                  active={answers.mobility === opt}
+                  onClick={() => update({ mobility: opt })}
+                  label={t.onboarding.mobilityOptions[opt]}
+                />
+              ))}
+            </div>
+          </Step>
+        )}
+
+        {step === 'avoid' && (
+          <Step title={t.onboarding.avoidQ} hint={t.onboarding.avoidHint}>
+            <button
+              type="button"
+              onClick={() => update({ avoidAreas: [] })}
+              className={`mb-2 w-full rounded-2xl border px-4 py-3 text-left text-sm font-display transition-all ${
+                answers.avoidAreas.length === 0
+                  ? 'border-neon-500 bg-neon-500/10 text-neon-200 shadow-glow'
+                  : 'border-white/10 bg-white/[0.02] text-neutral-200 hover:bg-white/[0.05]'
+              }`}
+            >
+              {t.onboarding.avoidOptions.none}
+            </button>
+            <div className="grid grid-cols-2 gap-2">
+              {AVOID_AREA_OPTIONS.map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => toggleAvoidArea(opt)}
+                  className={`rounded-2xl border px-4 py-3 text-left text-sm font-display transition-all ${
+                    answers.avoidAreas.includes(opt)
+                      ? 'border-warn-amber bg-warn-amber/10 text-warn-amber shadow-glow'
+                      : 'border-white/10 bg-white/[0.02] text-neutral-200 hover:bg-white/[0.05]'
+                  }`}
+                >
+                  {t.onboarding.avoidOptions[opt]}
+                </button>
+              ))}
+            </div>
+          </Step>
+        )}
+
+        {step === 'notes' && (
+          <Step title={t.onboarding.notesQ}>
             <textarea
               rows={3}
-              value={answers.condition}
-              onChange={(e) => update({ condition: e.target.value })}
-              placeholder={t.onboarding.conditionPlaceholder}
+              value={answers.notes}
+              onChange={(e) => update({ notes: e.target.value })}
+              placeholder={t.onboarding.notesPlaceholder}
               className="input resize-none"
             />
           </Step>
@@ -305,9 +430,9 @@ export function OnboardingPage() {
           disabled={!canAdvance}
           className="btn-primary w-full"
         >
-          {stepIndex === STEPS.length - 1 ? t.onboarding.finish : t.common.continue}
+          {stepIndex === steps.length - 1 ? t.onboarding.finish : t.common.continue}
         </button>
-        {step === 'condition' && !answers.condition && (
+        {step === 'notes' && !answers.notes && (
           <button
             onClick={finish}
             className="mt-2 w-full text-center text-xs text-neutral-500"

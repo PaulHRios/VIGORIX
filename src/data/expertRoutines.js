@@ -1983,6 +1983,447 @@ export const PER_SCHEDULE_ROUTINES = {
 };
 
 // =============================================================
+// SPECIAL-POPULATION ROUTINES
+// Pregnancy-safe, senior-friendly, low-impact / mobility-focused.
+// All exercises here are deliberately scaled to the population —
+// no jumping, no spinal load, no breath-hold under heavy weight.
+// =============================================================
+
+export const POPULATION_ROUTINES = {
+  pregnancy: {
+    full_body: [
+      {
+        id: 'preg_full_body_acog',
+        title: { en: 'ACOG-aligned Pregnancy Full Body', es: 'Cuerpo completo embarazo (estilo ACOG)' },
+        author: 'Inspired by ACOG / Brianna Battles guidelines',
+        level: 'beginner',
+        goal: 'general',
+        durationMin: 35,
+        summary: {
+          en: 'Safe through any trimester. Avoids supine work after T1, no breath-holding, light to moderate load. Stop anytime you feel dizzy or short of breath.',
+          es: 'Seguro en cualquier trimestre. Evita decúbito supino después del T1, sin Valsalva, carga ligera a moderada. Detente si sientes mareo o falta de aire.',
+        },
+        exercises: [
+          ex('Goblet Squat (light)', 'Sentadilla goblet (ligera)', 3, '10-12', 60,
+            { en: 'Heels grounded, chest tall. Stop above 90° if belly limits depth.', es: 'Talones al suelo, pecho alto. Detente arriba de 90° si la barriga limita.' }),
+          ex('Incline Push-up (bench/wall)', 'Flexión inclinada (banco/pared)', 3, '8-12', 60,
+            { en: 'Higher incline = easier on belly. Strict tempo.', es: 'Más inclinación = menos presión abdominal. Tempo estricto.' }),
+          ex('Cable Row Seated', 'Remo sentado en polea', 3, '10-12', 60,
+            { en: 'Posture work — counters the forward pull of pregnancy.', es: 'Trabajo postural — contrarresta el tirón hacia delante del embarazo.' }),
+          ex('Side-lying Hip Abduction', 'Abducción de cadera tumbada de lado', 3, '12-15 each side', 45,
+            { en: 'Glute med work for pelvic stability.', es: 'Glúteo medio para estabilidad de pelvis.' }),
+          ex('Bird Dog', 'Bird dog', 3, '8 each side', 45,
+            { en: 'Diastasis-friendly core. Keep ribcage stacked over pelvis.', es: 'Core compatible con diástasis. Costillas apiladas sobre pelvis.' }),
+        ],
+      },
+      {
+        id: 'preg_full_body_t3',
+        title: { en: 'Third-trimester Maintenance', es: 'Mantenimiento 3er trimestre' },
+        author: 'Inspired by Dr. Rebecca Dekker (Evidence Based Birth)',
+        level: 'beginner',
+        goal: 'mobility',
+        durationMin: 25,
+        summary: {
+          en: 'Low intensity, joint-friendly. Focuses on hips, glutes, posture and breathing for the final weeks.',
+          es: 'Baja intensidad, amable con articulaciones. Foco en cadera, glúteos, postura y respiración para las últimas semanas.',
+        },
+        exercises: [
+          ex('Sumo Squat to Box', 'Sentadilla sumo a banco', 3, '10', 60),
+          ex('Wall Push-up', 'Flexión en pared', 3, '10-15', 45),
+          ex('Single-arm Dumbbell Row', 'Remo unilateral con mancuerna', 3, '10 each', 60),
+          ex('Glute Bridge (single leg, supported)', 'Puente de glúteos apoyado', 3, '10 each', 45,
+            { en: 'Stop after 16 weeks if supine becomes uncomfortable.', es: 'Detente tras la semana 16 si el supino te incomoda.' }),
+          ex('Cat–Cow Breathing', 'Gato–vaca con respiración', 2, '10 cycles', 30),
+        ],
+      },
+    ],
+    glutes: [
+      {
+        id: 'preg_glutes',
+        title: { en: 'Pelvic Floor & Glute Med', es: 'Suelo pélvico y glúteo medio' },
+        author: 'Inspired by Brianna Battles',
+        level: 'beginner',
+        goal: 'general',
+        durationMin: 25,
+        summary: {
+          en: 'Targets the muscles that suffer most during pregnancy: glute med (pelvic stability), glute max, posterior chain. No supine after T1.',
+          es: 'Apunta a los músculos que más sufren en el embarazo: glúteo medio (estabilidad pélvica), mayor y cadena posterior. Sin supino tras T1.',
+        },
+        exercises: [
+          ex('Cable Hip Abduction', 'Abducción de cadera en polea', 4, '12 each', 45),
+          ex('Step-up to Box (mid height)', 'Step-up a cajón medio', 3, '10 each', 60),
+          ex('Quadruped Hip Extension', 'Extensión de cadera en cuadrupedia', 3, '12 each', 45),
+          ex('Banded Clamshell', 'Almeja con banda', 3, '15 each', 30),
+          ex('Wall Sit', 'Sentadilla en pared', 3, '20-30 s', 45,
+            { en: 'Stop if hips or knees bother you. Breathe normally.', es: 'Detente si te duelen cadera o rodillas. Respira normal.' }),
+        ],
+      },
+    ],
+    back: [
+      {
+        id: 'preg_back',
+        title: { en: 'Pregnancy Posture Back', es: 'Espalda postural embarazo' },
+        author: 'Inspired by Dr. Sarah Duvall',
+        level: 'beginner',
+        goal: 'general',
+        durationMin: 25,
+        summary: {
+          en: 'Reverses pregnancy kyphosis. Light loads, lots of scapular work, no overhead pulling.',
+          es: 'Revierte la cifosis del embarazo. Cargas ligeras, mucho trabajo escapular, sin tirones arriba de la cabeza.',
+        },
+        exercises: [
+          ex('Seated Cable Row', 'Remo sentado en polea', 4, '10-12', 60),
+          ex('Chest-supported Dumbbell Row', 'Remo con mancuernas en banco inclinado', 3, '10', 60),
+          ex('Face Pull', 'Face pull', 3, '12-15', 45),
+          ex('Band Pull-apart', 'Apertura con banda', 3, '15', 30),
+          ex('Standing Hip Hinge', 'Hip hinge de pie', 3, '10', 45,
+            { en: 'Pattern training, no load. Brace core gently.', es: 'Patrón sin carga. Contrae el core con suavidad.' }),
+        ],
+      },
+    ],
+    shoulders: [
+      {
+        id: 'preg_shoulders',
+        title: { en: 'Pregnancy Shoulder Health', es: 'Salud de hombros en embarazo' },
+        author: 'Inspired by Mary Catherine Starr',
+        level: 'beginner',
+        goal: 'general',
+        durationMin: 20,
+        summary: {
+          en: 'Light dumbbell work to keep upper-body strong without overhead spinal loading. Great for prepping to carry the baby.',
+          es: 'Trabajo ligero con mancuernas para mantener fuerte el tren superior sin cargar arriba. Ideal para prepararse a cargar al bebé.',
+        },
+        exercises: [
+          ex('Lateral Raise (light)', 'Elevación lateral ligera', 4, '12-15', 45),
+          ex('Front Raise (alternating)', 'Elevación frontal alterna', 3, '10 each', 45),
+          ex('Reverse Fly (chest-supported)', 'Apertura inversa apoyado', 3, '12', 45),
+          ex('Carries (suitcase, light)', 'Carry tipo maleta ligero', 3, '20 m each', 60),
+        ],
+      },
+    ],
+    legs: [
+      {
+        id: 'preg_legs',
+        title: { en: 'Pregnancy-safe Lower Body', es: 'Tren inferior apto embarazo' },
+        author: 'Inspired by Brianna Battles',
+        level: 'beginner',
+        goal: 'general',
+        durationMin: 35,
+        summary: {
+          en: 'No deep squats, no jumping, no Valsalva. Box squats, RDLs and unilateral work keep the hips strong and the pelvic floor happy.',
+          es: 'Sin sentadilla profunda, sin saltos, sin Valsalva. Sentadilla a cajón, RDL y trabajo unilateral mantienen las caderas fuertes y el suelo pélvico contento.',
+        },
+        exercises: [
+          ex('Box Squat (knees > 90°)', 'Sentadilla a cajón (rodilla > 90°)', 4, '8-10', 75),
+          ex('Romanian Deadlift (light)', 'Peso muerto rumano ligero', 3, '10-12', 60),
+          ex('Reverse Lunge (supported)', 'Zancada inversa apoyada', 3, '8 each', 60),
+          ex('Calf Raise (standing)', 'Elevación de pantorrilla de pie', 3, '15-20', 30),
+          ex('Side-lying Clamshell', 'Almeja tumbada de lado', 3, '15 each', 30),
+        ],
+      },
+    ],
+    abs: [
+      {
+        id: 'preg_core',
+        title: { en: 'Diastasis-friendly Core', es: 'Core apto diástasis' },
+        author: 'Inspired by Dr. Sarah Duvall (Core Exercise Solutions)',
+        level: 'beginner',
+        goal: 'mobility',
+        durationMin: 20,
+        summary: {
+          en: 'Avoids any move that domes the abdomen. Builds deep-core strength to support the spine and pelvis.',
+          es: 'Evita cualquier movimiento que abulte el abdomen. Construye fuerza de core profundo para sostener columna y pelvis.',
+        },
+        exercises: [
+          ex('Deep Belly Breathing', 'Respiración diafragmática profunda', 3, '10 cycles', 30),
+          ex('Bird Dog (slow)', 'Bird dog (lento)', 3, '6 each', 45),
+          ex('Side Plank from Knees', 'Plancha lateral apoyada en rodillas', 3, '15-20 s each', 45),
+          ex('Standing Pelvic Tilt', 'Báscula pélvica de pie', 3, '10', 30),
+          ex('Wall-supported Heel Slide', 'Deslizamiento de talón en pared', 3, '10 each', 30),
+        ],
+      },
+    ],
+  },
+
+  senior: {
+    full_body: [
+      {
+        id: 'senior_full_body_strong',
+        title: { en: 'Strong After 60 — Full Body', es: 'Fuerte después de los 60 — cuerpo completo' },
+        author: 'Inspired by Dr. Belinda Beck (LIFTMOR research)',
+        level: 'beginner',
+        goal: 'strength',
+        durationMin: 40,
+        summary: {
+          en: 'Evidence-based: high-effort resistance training 2–3×/week reverses bone loss in seniors. We adapt the LIFTMOR template — heavy by RPE, light by absolute load.',
+          es: 'Basado en evidencia: entrenar fuerza 2–3×/semana con buen esfuerzo revierte la pérdida ósea en mayores. Adaptamos LIFTMOR — pesado por RPE, ligero por carga absoluta.',
+        },
+        exercises: [
+          ex('Goblet Squat to Chair', 'Sentadilla goblet a silla', 3, '6-8', 120,
+            { en: 'Sit, stand, control descent. Heaviest dumbbell you can use safely.', es: 'Siéntate, levanta, controla la bajada. La mancuerna más pesada que controles.' }),
+          ex('Trap Bar Deadlift (light)', 'Peso muerto en barra trap (ligero)', 3, '5-6', 150,
+            { en: 'Easier on the lower back than a conventional deadlift.', es: 'Más amable con la zona lumbar que el peso muerto convencional.' }),
+          ex('Chest-supported Row', 'Remo apoyado en banco', 3, '8-10', 90),
+          ex('Seated Dumbbell Press (neutral grip)', 'Press sentado mancuernas (agarre neutro)', 3, '8-10', 90),
+          ex('Heel-to-Toe Walk', 'Caminata talón-punta', 3, '20 steps', 30,
+            { en: 'Balance work — non-negotiable for fall prevention.', es: 'Equilibrio — innegociable para prevenir caídas.' }),
+        ],
+      },
+      {
+        id: 'senior_full_body_balance',
+        title: { en: 'Balance, Mobility & Light Strength', es: 'Equilibrio, movilidad y fuerza ligera' },
+        author: 'Inspired by NIA Go4Life',
+        level: 'beginner',
+        goal: 'general',
+        durationMin: 30,
+        summary: {
+          en: 'Joint-friendly circuit. Targets the four pillars NIA recommends for older adults: strength, balance, flexibility, endurance.',
+          es: 'Circuito amable con articulaciones. Apunta a los 4 pilares que recomienda el NIA: fuerza, equilibrio, flexibilidad y resistencia.',
+        },
+        exercises: [
+          ex('Sit-to-Stand', 'Sentadilla en silla (sit-to-stand)', 3, '10-12', 60),
+          ex('Standing Resistance Band Row', 'Remo de pie con banda', 3, '12', 45),
+          ex('Heel Raise (with support)', 'Elevación de talón apoyado', 3, '15', 30),
+          ex('Single-leg Stand (counter support)', 'Apoyo monopodal junto a barra', 2, '20 s each', 30),
+          ex('Marching in Place', 'Marcha en el sitio', 2, '30 s', 30),
+        ],
+      },
+    ],
+    legs: [
+      {
+        id: 'senior_legs',
+        title: { en: 'Senior Lower Body — Bone & Power', es: 'Tren inferior mayor — hueso y potencia' },
+        author: 'Inspired by Dr. Maria Fiatarone Singh',
+        level: 'beginner',
+        goal: 'strength',
+        durationMin: 35,
+        summary: {
+          en: 'Power matters more than absolute strength after 60 — it predicts independence. Move concentrically as fast as is safe.',
+          es: 'Tras los 60 importa más la potencia que la fuerza absoluta — predice independencia. Sube rápido pero seguro.',
+        },
+        exercises: [
+          ex('Goblet Squat (fast up, slow down)', 'Sentadilla goblet (rápido arriba, lento abajo)', 4, '6-8', 90),
+          ex('Leg Press (machine)', 'Prensa de piernas', 3, '8-10', 90),
+          ex('Step-up to Low Box', 'Step-up a cajón bajo', 3, '8 each', 60),
+          ex('Standing Calf Raise', 'Elevación de pantorrilla de pie', 3, '12-15', 45),
+          ex('Lateral Step (banded)', 'Paso lateral con banda', 3, '12 each', 30),
+        ],
+      },
+    ],
+    back: [
+      {
+        id: 'senior_back',
+        title: { en: 'Senior Back & Posture', es: 'Espalda y postura mayor' },
+        author: 'Inspired by Stuart McGill (Big 3)',
+        level: 'beginner',
+        goal: 'general',
+        durationMin: 30,
+        summary: {
+          en: 'Spine-sparing back work. The McGill Big 3 protect the lumbar; rows and pulls keep the upper back upright.',
+          es: 'Trabajo de espalda que cuida la columna. Los Big 3 de McGill protegen la lumbar; remos y tirones mantienen la espalda alta erguida.',
+        },
+        exercises: [
+          ex('Bird Dog', 'Bird dog', 3, '8 each', 45),
+          ex('Side Plank from Knees', 'Plancha lateral en rodillas', 3, '15-20 s each', 45),
+          ex('Curl-up (McGill)', 'Curl-up (McGill)', 3, '5-8', 30),
+          ex('Seated Cable Row', 'Remo sentado en polea', 3, '10-12', 75),
+          ex('Lat Pulldown (light)', 'Jalón al pecho ligero', 3, '10', 75),
+        ],
+      },
+    ],
+    chest: [
+      {
+        id: 'senior_chest',
+        title: { en: 'Senior Push Strength', es: 'Empuje fuerza mayor' },
+        author: 'Inspired by Dr. Stuart Phillips',
+        level: 'beginner',
+        goal: 'strength',
+        durationMin: 25,
+        summary: {
+          en: 'Pressing strength keeps activities of daily living easy. Machine and supported variants keep the shoulders happy.',
+          es: 'La fuerza de empuje hace fáciles las actividades diarias. Variantes en máquina y apoyadas cuidan el hombro.',
+        },
+        exercises: [
+          ex('Machine Chest Press', 'Press de pecho en máquina', 3, '8-10', 90),
+          ex('Incline Dumbbell Press (neutral)', 'Press inclinado mancuernas (neutro)', 3, '8-10', 90),
+          ex('Push-up (incline / on knees)', 'Flexión inclinada / en rodillas', 3, 'AMRAP', 60),
+          ex('Cable Chest Fly (low)', 'Cruce en polea baja', 3, '10-12', 60),
+        ],
+      },
+    ],
+    shoulders: [
+      {
+        id: 'senior_shoulders',
+        title: { en: 'Senior Shoulder Health', es: 'Salud de hombro mayor' },
+        author: 'Inspired by Dr. Jeremy James',
+        level: 'beginner',
+        goal: 'general',
+        durationMin: 25,
+        summary: {
+          en: 'Rotator-cuff and upper back work to bullet-proof the shoulder. No barbell overhead — only neutral or pain-free angles.',
+          es: 'Manguito rotador y espalda alta para blindar el hombro. Sin barra por encima de la cabeza — solo ángulos neutros o sin dolor.',
+        },
+        exercises: [
+          ex('Banded External Rotation', 'Rotación externa con banda', 3, '12 each', 45),
+          ex('Lateral Raise (light)', 'Elevación lateral ligera', 3, '10-12', 45),
+          ex('Face Pull', 'Face pull', 3, '12-15', 45),
+          ex('Wall Slide', 'Deslizamiento en pared', 3, '10', 30),
+          ex('Y–T–W Raise (prone)', 'Y–T–W boca abajo', 3, '8 each letter', 45),
+        ],
+      },
+    ],
+    biceps: [
+      {
+        id: 'senior_biceps',
+        title: { en: 'Senior Arms — Carry & Curl', es: 'Brazos mayor — cargar y curl' },
+        author: 'Inspired by Dr. Stuart Phillips',
+        level: 'beginner',
+        goal: 'general',
+        durationMin: 20,
+        summary: {
+          en: 'Practical arm strength — carry groceries, lift grandkids. No barbells, just dumbbells and bands.',
+          es: 'Fuerza de brazo práctica — cargar la compra, levantar nietos. Sin barras, solo mancuernas y bandas.',
+        },
+        exercises: [
+          ex('Dumbbell Curl (alternating)', 'Curl alterno con mancuernas', 3, '10-12', 60),
+          ex('Hammer Curl', 'Curl martillo', 3, '10', 60),
+          ex('Suitcase Carry', 'Carry tipo maleta', 3, '20 m each', 60),
+          ex('Band Curl', 'Curl con banda', 3, '12-15', 45),
+        ],
+      },
+    ],
+    triceps: [
+      {
+        id: 'senior_triceps',
+        title: { en: 'Senior Triceps — Easy Press', es: 'Tríceps mayor — empuje fácil' },
+        author: 'Inspired by Eric Cressey',
+        level: 'beginner',
+        goal: 'general',
+        durationMin: 20,
+        summary: {
+          en: 'Tricep strength helps push out of a chair, push a door, brace a fall. Cable and band work spares the elbow.',
+          es: 'El tríceps fuerte ayuda a salir de una silla, empujar una puerta, frenar una caída. Polea y banda cuidan el codo.',
+        },
+        exercises: [
+          ex('Cable Triceps Pressdown', 'Pressdown de tríceps en polea', 3, '12', 60),
+          ex('Overhead Band Extension (single arm)', 'Extensión arriba con banda (un brazo)', 3, '12 each', 45),
+          ex('Bench Dips (feet on floor)', 'Fondos en banco con pies en suelo', 3, '8-10', 60),
+          ex('Push-up (incline)', 'Flexión inclinada', 3, 'AMRAP', 60),
+        ],
+      },
+    ],
+  },
+
+  mobility: {
+    full_body: [
+      {
+        id: 'mob_low_impact_circuit',
+        title: { en: 'Low-impact Full Body Circuit', es: 'Circuito cuerpo completo bajo impacto' },
+        author: 'Inspired by Tony Horton & physiotherapy clinics',
+        level: 'beginner',
+        goal: 'mobility',
+        durationMin: 30,
+        summary: {
+          en: 'Zero jumping, zero spinal load. Designed for people coming back from injury or with chronic pain. Builds capacity gradually.',
+          es: 'Cero saltos, cero carga axial. Pensado para gente que vuelve de lesión o con dolor crónico. Construye capacidad gradualmente.',
+        },
+        exercises: [
+          ex('Cat–Cow', 'Gato–vaca', 2, '10', 30),
+          ex('Glute Bridge', 'Puente de glúteos', 3, '12', 45),
+          ex('Bird Dog', 'Bird dog', 3, '8 each', 45),
+          ex('Wall Push-up', 'Flexión en pared', 3, '10-15', 45),
+          ex('Seated Band Row', 'Remo sentado con banda', 3, '12', 45),
+          ex('Standing Calf Raise', 'Elevación de pantorrilla', 3, '15', 30),
+        ],
+      },
+      {
+        id: 'mob_chair_workout',
+        title: { en: 'Chair Workout — Total Body', es: 'Entreno en silla — cuerpo completo' },
+        author: 'Inspired by Silver Sneakers',
+        level: 'beginner',
+        goal: 'mobility',
+        durationMin: 25,
+        summary: {
+          en: 'Done entirely seated or holding the chair. Perfect for severe mobility limits, recovery from surgery, or extreme deconditioning.',
+          es: 'Todo sentado o agarrando la silla. Perfecto para limitaciones severas, recuperación post-cirugía o desacondicionamiento extremo.',
+        },
+        exercises: [
+          ex('Seated Marches', 'Marchas sentado', 2, '20 reps', 30),
+          ex('Seated Knee Extension', 'Extensión de rodilla sentado', 3, '12 each', 30),
+          ex('Seated Dumbbell Press (light)', 'Press sentado mancuernas ligero', 3, '10', 60),
+          ex('Seated Band Row', 'Remo sentado con banda', 3, '12', 45),
+          ex('Seated Heel Raise', 'Elevación de talón sentado', 3, '15', 30),
+          ex('Seated Trunk Rotation (gentle)', 'Rotación de tronco suave', 2, '10 each', 30),
+        ],
+      },
+    ],
+    back: [
+      {
+        id: 'mob_back_decompress',
+        title: { en: 'Back Decompression & Mobility', es: 'Descompresión y movilidad de espalda' },
+        author: 'Inspired by Dr. Stuart McGill',
+        level: 'beginner',
+        goal: 'mobility',
+        durationMin: 20,
+        summary: {
+          en: 'Gentle protocol for chronic lower back pain. Builds endurance in the spinal stabilizers without flexing or loading the spine.',
+          es: 'Protocolo suave para dolor lumbar crónico. Fortalece estabilizadores sin flexionar ni cargar la columna.',
+        },
+        exercises: [
+          ex('Curl-up (McGill)', 'Curl-up (McGill)', 3, '5', 30),
+          ex('Side Plank from Knees', 'Plancha lateral en rodillas', 3, '15 s each', 45),
+          ex('Bird Dog', 'Bird dog', 3, '8 each', 45),
+          ex('Glute Bridge', 'Puente de glúteos', 3, '12', 45),
+          ex('Cat–Cow', 'Gato–vaca', 2, '10', 30),
+        ],
+      },
+    ],
+    legs: [
+      {
+        id: 'mob_legs_knee_friendly',
+        title: { en: 'Knee-friendly Legs', es: 'Piernas amables con la rodilla' },
+        author: 'Inspired by Dr. Andreo Spina (FRC)',
+        level: 'beginner',
+        goal: 'mobility',
+        durationMin: 25,
+        summary: {
+          en: 'Builds quad and glute strength without deep flexion under load. Great for arthritis, ACL recovery, or chronic knee pain.',
+          es: 'Construye fuerza de cuádriceps y glúteo sin flexión profunda con carga. Ideal para artritis, recuperación de LCA o dolor crónico.',
+        },
+        exercises: [
+          ex('Wall Sit (low intensity)', 'Sentadilla en pared baja intensidad', 3, '20-30 s', 60),
+          ex('Step-up to Low Box', 'Step-up a cajón bajo', 3, '8 each', 60),
+          ex('Glute Bridge', 'Puente de glúteos', 3, '12', 45),
+          ex('Romanian Deadlift (light)', 'Peso muerto rumano ligero', 3, '10', 60),
+          ex('Banded Lateral Step', 'Paso lateral con banda', 3, '12 each', 30),
+        ],
+      },
+    ],
+    shoulders: [
+      {
+        id: 'mob_shoulder_rehab',
+        title: { en: 'Shoulder Rehab Lite', es: 'Rehab de hombro suave' },
+        author: 'Inspired by Dr. Aaron Horschig (Squat University)',
+        level: 'beginner',
+        goal: 'mobility',
+        durationMin: 20,
+        summary: {
+          en: 'Rotator-cuff and scapular control work. No overhead pressing. Use light bands or tiny dumbbells.',
+          es: 'Trabajo de manguito y control escapular. Sin press arriba. Usa bandas suaves o mancuernas pequeñas.',
+        },
+        exercises: [
+          ex('Banded External Rotation', 'Rotación externa con banda', 3, '15 each', 45),
+          ex('Banded Internal Rotation', 'Rotación interna con banda', 3, '15 each', 45),
+          ex('Wall Slide', 'Deslizamiento en pared', 3, '10', 30),
+          ex('Scapular Wall Push-up', 'Empuje escapular en pared', 3, '12', 30),
+          ex('Y–T–W (prone, light)', 'Y–T–W boca abajo, ligero', 3, '8 each letter', 45),
+        ],
+      },
+    ],
+  },
+};
+
+// =============================================================
 // LEVEL / GOAL FILTERS
 // =============================================================
 
@@ -2003,4 +2444,26 @@ export function filterRoutines(routines, { level, goal } = {}) {
     });
   }
   return out;
+}
+
+/**
+ * Pick the population bucket that best matches a profile.
+ * Pregnancy beats senior beats mobility — most specific wins.
+ */
+export function recommendedPopulation(profile = {}) {
+  if (profile.pregnancy && profile.pregnancy !== 'none') return 'pregnancy';
+  if (profile.mobility === 'severe' || profile.mobility === 'mild') return 'mobility';
+  if (Number(profile.age) >= 60) return 'senior';
+  return 'standard';
+}
+
+/**
+ * Available muscle groups for a given population (helps the UI hide groups
+ * that have no curated routine).
+ */
+export function populationMuscles(population) {
+  if (population === 'standard') return null; // means: use the standard list
+  const bucket = POPULATION_ROUTINES[population];
+  if (!bucket) return [];
+  return Object.keys(bucket);
 }

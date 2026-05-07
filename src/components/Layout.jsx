@@ -139,10 +139,13 @@ function ExpertsIcon({ className }) {
 }
 
 function DietIcon({ className }) {
+  // Fork & knife — utensils.
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M12 4c-3 0-5 2.5-5 5 0 3 5 11 5 11s5-8 5-11c0-2.5-2-5-5-5z" strokeLinejoin="round" />
-      <circle cx="12" cy="9" r="1" fill="currentColor" />
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 3v6" />
+      <path d="M5 3v5a3 3 0 0 0 3 3v10" />
+      <path d="M11 3v5a3 3 0 0 1-3 3" />
+      <path d="M16 3c-1.2 1-2 3-2 5 0 2 1 3 2 3v10" />
     </svg>
   );
 }

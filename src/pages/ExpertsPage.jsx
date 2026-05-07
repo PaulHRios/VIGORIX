@@ -15,28 +15,53 @@ import { getProfile } from '../services/userProfile.js';
 import {
   PER_MUSCLE_ROUTINES,
   PER_SCHEDULE_ROUTINES,
+  POPULATION_ROUTINES,
+  recommendedPopulation,
+  populationMuscles,
   expertYoutubeUrl,
   filterRoutines,
 } from '../data/expertRoutines.js';
 import { saveRoutine } from '../services/storageService.js';
 
-const MUSCLE_KEYS = ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'legs', 'glutes', 'abs'];
+const STANDARD_MUSCLE_KEYS = ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'legs', 'glutes', 'abs'];
 const SCHEDULE_KEYS = [3, 4, 5, 6, 7];
+const POPULATION_KEYS = ['standard', 'pregnancy', 'senior', 'mobility'];
 
 export function ExpertsPage() {
   const { t, lang } = useLanguage();
+  const profile = useMemo(() => getProfile(), []);
+  const recommended = useMemo(() => recommendedPopulation(profile), [profile]);
+
   const [tab, setTab] = useState('muscle'); // 'muscle' | 'schedule'
-  const [muscle, setMuscle] = useState('chest');
+  const [population, setPopulation] = useState(recommended);
   const [days, setDays] = useState(4);
   const [openId, setOpenId] = useState(null);
   const [savedFlash, setSavedFlash] = useState(null);
 
-  const profile = useMemo(() => getProfile(), []);
+  // Muscle keys depend on which population bucket is active.
+  const muscleKeys = useMemo(() => {
+    if (population === 'standard') return STANDARD_MUSCLE_KEYS;
+    return populationMuscles(population) || [];
+  }, [population]);
 
-  const muscleRoutines = useMemo(
-    () => filterRoutines(PER_MUSCLE_ROUTINES[muscle] || [], { level: profile.level, goal: profile.goal }),
-    [muscle, profile.level, profile.goal],
-  );
+  const [muscle, setMuscle] = useState(muscleKeys[0] || 'chest');
+
+  // Reset muscle selection when the population changes and the previous muscle
+  // no longer exists in the new bucket.
+  useMemo(() => {
+    if (!muscleKeys.includes(muscle)) setMuscle(muscleKeys[0] || 'chest');
+  }, [muscleKeys, muscle]);
+
+  const muscleRoutines = useMemo(() => {
+    const source =
+      population === 'standard'
+        ? PER_MUSCLE_ROUTINES[muscle] || []
+        : POPULATION_ROUTINES[population]?.[muscle] || [];
+    // For special populations we ignore level/goal filtering — every routine
+    // there is already curated for that audience.
+    if (population !== 'standard') return source;
+    return filterRoutines(source, { level: profile.level, goal: profile.goal });
+  }, [population, muscle, profile.level, profile.goal]);
 
   const scheduleRoutines = useMemo(
     () => filterRoutines(PER_SCHEDULE_ROUTINES[days] || [], { level: profile.level, goal: profile.goal }),
@@ -112,9 +137,26 @@ export function ExpertsPage() {
 
       {tab === 'muscle' && (
         <>
+          <Section title={t.experts.population}>
+            <div className="flex flex-wrap gap-1.5">
+              {POPULATION_KEYS.map((p) => (
+                <Chip
+                  key={p}
+                  active={population === p}
+                  onClick={() => setPopulation(p)}
+                  label={t.experts.populations[p]}
+                  badge={recommended === p && p !== 'standard' ? '★' : null}
+                />
+              ))}
+            </div>
+            {recommended !== 'standard' && population === recommended && (
+              <p className="text-[11px] text-neon-300">{t.experts.autoRecommended}</p>
+            )}
+          </Section>
+
           <Section title={t.experts.pickMuscle}>
             <div className="flex flex-wrap gap-1.5">
-              {MUSCLE_KEYS.map((m) => (
+              {muscleKeys.map((m) => (
                 <Chip key={m} active={muscle === m} onClick={() => setMuscle(m)} label={t.form.muscleOptions[m] || m} />
               ))}
             </div>
@@ -325,7 +367,7 @@ function Section({ title, children }) {
   );
 }
 
-function Chip({ active, onClick, label, fill }) {
+function Chip({ active, onClick, label, fill, badge }) {
   return (
     <button
       type="button"
@@ -338,6 +380,7 @@ function Chip({ active, onClick, label, fill }) {
           : 'border-white/10 bg-white/[0.03] text-neutral-300 hover:bg-white/[0.06]'
       }`}
     >
+      {badge && <span className="text-neon-400">{badge}</span>}
       {label}
     </button>
   );

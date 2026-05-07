@@ -105,6 +105,47 @@ export const translations = {
       conditionPlaceholder: 'e.g. knee pain, pregnancy, lower back. Leave empty if none.',
       conditionSkip: 'Skip',
 
+      // Pregnancy
+      pregnancyQ: 'Are you pregnant or recently postpartum?',
+      pregnancyHint: 'We will suggest pregnancy-safe exercises and avoid risky positions.',
+      pregnancyOptions: {
+        none: 'No',
+        t1: 'Pregnant — 1st trimester',
+        t2: 'Pregnant — 2nd trimester',
+        t3: 'Pregnant — 3rd trimester',
+        postpartum: 'Postpartum (< 6 months)',
+      },
+
+      // Mobility / effort capacity
+      mobilityQ: 'How much physical effort can you handle?',
+      mobilityHint: 'Be honest — we will scale every exercise to your capacity.',
+      mobilityOptions: {
+        full: 'Full capacity — no limits',
+        mild: 'Mild limit — get tired fast or have minor pain',
+        severe: 'Severe limit — chair / bed friendly only',
+      },
+
+      // Areas / joints to avoid
+      avoidQ: 'Any body areas to take it easy on?',
+      avoidHint: 'Tap any joint or area that bothers you. We will skip exercises that load it.',
+      avoidOptions: {
+        none: 'Nothing — feeling great',
+        knee: 'Knees',
+        lower_back: 'Lower back',
+        upper_back: 'Upper back / neck',
+        shoulder: 'Shoulders',
+        wrist: 'Wrists',
+        elbow: 'Elbows',
+        hip: 'Hips',
+        ankle: 'Ankles',
+        chest: 'Chest / heart',
+        abdomen: 'Abdomen (post-surgery)',
+      },
+
+      // Free-text notes (kept as the final optional step)
+      notesQ: 'Anything else we should know? (optional)',
+      notesPlaceholder: 'Allergies, medications, recent surgeries, anything that affects training…',
+
       finish: 'Save & continue',
     },
 
@@ -315,6 +356,21 @@ export const translations = {
       },
       weightFromEstimate:
         'No body-weight log yet — using a healthy-BMI estimate. Log your real weight in Progress for a more accurate plan.',
+      mealPrepQ: 'Variety or meal-prep?',
+      mealPrepHint: 'Cook the same meals all week or rotate by day.',
+      mealPrepOptions: {
+        rotate: 'Rotate daily',
+        prep: 'Same meals all week',
+      },
+      mealPrepBadge: 'Meal-prep mode',
+      kcalQ: 'Daily calorie target',
+      kcalHint: 'Suggested for your goal — change if you really know what you want.',
+      kcalSuggested: 'Suggested',
+      kcalCustom: 'Custom',
+      kcalReset: 'Reset to suggested',
+      kcalWarnLow: 'That is below the typical safety floor (1200/1500 kcal). Protein will be kept high but be careful.',
+      proteinFloor: 'Protein floor',
+      proteinFloorNote: 'Protein stays at your goal-based g/kg. Carbs and fat absorb the change.',
       supplements: 'Protein & creatine guidance',
       supplementsSub: 'General recommendations for healthy adults. Talk to your doctor if you have kidney issues or take medication.',
       creatine: 'Creatine monohydrate',
@@ -335,6 +391,14 @@ export const translations = {
       noResults: 'No expert routines match your level/goal. Try adjusting your profile.',
       disclaimer:
         'These templates are inspired by published programs from well-known coaches and adapted to our format. Always warm up properly, scale weights to your level, and stop if anything hurts.',
+      population: 'Routine type',
+      populations: {
+        standard: 'Standard',
+        pregnancy: 'Pregnancy-safe',
+        senior: 'Seniors (60+)',
+        mobility: 'Low-impact / mobility',
+      },
+      autoRecommended: 'Auto-recommended for your profile',
     },
 
     weekly: {
@@ -368,6 +432,8 @@ export const translations = {
 
     nav: {
       builder: 'Crear',
+      experts: 'Expertos',
+      diet: 'Dieta',
       saved: 'Guardadas',
       progress: 'Progreso',
       account: 'Cuenta',
@@ -462,6 +528,47 @@ export const translations = {
       conditionQ: '¿Tienes alguna lesión o condición que debamos saber?',
       conditionPlaceholder: 'Ej.: dolor de rodilla, embarazo, espalda baja. Vacío si nada.',
       conditionSkip: 'Saltar',
+
+      // Pregnancy
+      pregnancyQ: '¿Estás embarazada o en posparto reciente?',
+      pregnancyHint: 'Sugerimos ejercicios seguros para embarazo y evitamos posturas de riesgo.',
+      pregnancyOptions: {
+        none: 'No',
+        t1: 'Embarazada — 1er trimestre',
+        t2: 'Embarazada — 2º trimestre',
+        t3: 'Embarazada — 3er trimestre',
+        postpartum: 'Posparto (< 6 meses)',
+      },
+
+      // Mobility / effort capacity
+      mobilityQ: '¿Cuánto esfuerzo físico puedes manejar?',
+      mobilityHint: 'Sé honesto — escalamos cada ejercicio a tu capacidad real.',
+      mobilityOptions: {
+        full: 'Capacidad total — sin límites',
+        mild: 'Límite leve — me canso rápido o me molesta algo',
+        severe: 'Límite severo — solo silla / cama',
+      },
+
+      // Areas / joints to avoid
+      avoidQ: '¿Alguna zona del cuerpo a la que cuidar?',
+      avoidHint: 'Toca cualquier articulación o zona que te moleste. Saltaremos los ejercicios que la carguen.',
+      avoidOptions: {
+        none: 'Nada — me siento bien',
+        knee: 'Rodillas',
+        lower_back: 'Zona lumbar',
+        upper_back: 'Espalda alta / cuello',
+        shoulder: 'Hombros',
+        wrist: 'Muñecas',
+        elbow: 'Codos',
+        hip: 'Caderas',
+        ankle: 'Tobillos',
+        chest: 'Pecho / corazón',
+        abdomen: 'Abdomen (post-cirugía)',
+      },
+
+      // Free-text notes (kept as the final optional step)
+      notesQ: '¿Algo más que debamos saber? (opcional)',
+      notesPlaceholder: 'Alergias, medicación, cirugías recientes, cualquier cosa que afecte al entreno…',
 
       finish: 'Guardar y continuar',
     },
@@ -671,6 +778,21 @@ export const translations = {
       },
       weightFromEstimate:
         'Aún no has registrado tu peso — usamos una estimación según IMC saludable. Registra tu peso real en Progreso para un plan más preciso.',
+      mealPrepQ: '¿Variedad o batch-cooking?',
+      mealPrepHint: 'Cocina lo mismo toda la semana o rota por día.',
+      mealPrepOptions: {
+        rotate: 'Rotar a diario',
+        prep: 'Misma receta toda la semana',
+      },
+      mealPrepBadge: 'Modo batch-cooking',
+      kcalQ: 'Objetivo de calorías diarias',
+      kcalHint: 'Sugerido según tu objetivo — cámbialo si sabes lo que haces.',
+      kcalSuggested: 'Sugerido',
+      kcalCustom: 'Personalizado',
+      kcalReset: 'Volver al sugerido',
+      kcalWarnLow: 'Eso está por debajo del mínimo de seguridad (1200/1500 kcal). Mantendremos la proteína alta, pero ten cuidado.',
+      proteinFloor: 'Mínimo de proteína',
+      proteinFloorNote: 'La proteína se mantiene en tus g/kg objetivo. Los carbohidratos y grasas absorben el cambio.',
       supplements: 'Guía de proteína y creatina',
       supplementsSub: 'Recomendaciones generales para adultos sanos. Habla con tu médico si tienes problemas renales o tomas medicación.',
       creatine: 'Creatina monohidrato',
@@ -691,6 +813,14 @@ export const translations = {
       noResults: 'No hay rutinas de expertos para tu nivel/objetivo. Ajusta tu perfil.',
       disclaimer:
         'Estas plantillas están inspiradas en programas publicados de entrenadores reconocidos y adaptadas a nuestro formato. Calienta bien, ajusta el peso a tu nivel y detente si algo duele.',
+      population: 'Tipo de rutina',
+      populations: {
+        standard: 'Estándar',
+        pregnancy: 'Aptas embarazo',
+        senior: 'Mayores (60+)',
+        mobility: 'Bajo impacto / movilidad',
+      },
+      autoRecommended: 'Recomendadas para tu perfil',
     },
 
     weekly: {
