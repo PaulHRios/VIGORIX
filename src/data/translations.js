@@ -211,7 +211,8 @@ export const translations = {
 
     share: {
       share: 'Share',
-      copied: 'Link copied to clipboard.',
+      copyLink: 'Copy link',
+      copied: 'Copied!',
       shareText: 'Check out my VIGORIX routine',
       importTitle: 'Import shared routine',
       importSub: 'You\'ve received a routine. Save it to your library to use it.',
@@ -219,6 +220,9 @@ export const translations = {
       importedPrefix: 'Shared',
       invalidLink: 'This link is broken or expired.',
       exercises: 'exercises',
+      modalSub: 'Scan the QR with another phone, copy the link, or use the share sheet.',
+      qrTooLong: 'This routine is too big for a QR — use the link instead.',
+      linkLabel: 'Tap link to copy',
     },
 
     loading: {
@@ -688,7 +692,8 @@ export const translations = {
 
     share: {
       share: 'Compartir',
-      copied: 'Enlace copiado al portapapeles.',
+      copyLink: 'Copiar enlace',
+      copied: '¡Copiado!',
       shareText: 'Mira mi rutina de VIGORIX',
       importTitle: 'Importar rutina compartida',
       importSub: 'Recibiste una rutina. Guárdala en tu biblioteca para usarla.',
@@ -696,6 +701,9 @@ export const translations = {
       importedPrefix: 'Compartida',
       invalidLink: 'Este enlace está roto o expirado.',
       exercises: 'ejercicios',
+      modalSub: 'Escanea el QR con otro teléfono, copia el enlace o usa el menú de compartir.',
+      qrTooLong: 'Esta rutina es demasiado grande para un QR — usa el enlace.',
+      linkLabel: 'Toca el enlace para copiar',
     },
 
     loading: {

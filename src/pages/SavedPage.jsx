@@ -6,11 +6,12 @@ import { listRoutines, deleteRoutine } from '../services/storageService.js';
 import { ExerciseCard } from '../components/ExerciseCard.jsx';
 import { WarningBanner } from '../components/WarningBanner.jsx';
 import { exportRoutinePdf } from '../utils/pdfExport.js';
-import { buildShareUrl } from '../utils/shareCodec.js';
+import { ShareModal } from '../components/ShareModal.jsx';
 
 export function SavedPage() {
   const { t, lang } = useLanguage();
   const navigate = useNavigate();
+  const [sharing, setSharing] = useState(null); // routine being shared
   const [items, setItems] = useState([]);
   const [open, setOpen] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -37,19 +38,8 @@ export function SavedPage() {
     refresh();
   }
 
-  async function handleShare(item) {
-    const url = buildShareUrl(item.name, item.routine);
-    const data = { title: item.name, text: t.share.shareText, url };
-    try {
-      if (navigator.share) {
-        await navigator.share(data);
-        return;
-      }
-      await navigator.clipboard.writeText(url);
-      alert(t.share.copied);
-    } catch (e) {
-      // user dismissed share sheet — no-op
-    }
+  function handleShare(item) {
+    setSharing(item);
   }
 
   // ---- DETAIL VIEW ----
@@ -146,6 +136,14 @@ export function SavedPage() {
             )}
           </>
         )}
+
+        {sharing && (
+          <ShareModal
+            name={sharing.name}
+            routine={sharing.routine}
+            onClose={() => setSharing(null)}
+          />
+        )}
       </div>
     );
   }
@@ -206,19 +204,41 @@ export function SavedPage() {
                   )}
                 </div>
               </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDelete(item.id);
-                }}
-                className="rounded-full border border-warn-red/30 px-2 py-1 text-[10px] uppercase tracking-wider text-warn-red hover:bg-warn-red/10"
-              >
-                {t.common.delete}
-              </button>
+              <div className="flex shrink-0 items-center gap-1">
+                {!isDiet && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleShare(item);
+                    }}
+                    aria-label={t.share.share}
+                    className="rounded-full border border-white/10 px-2 py-1 text-[10px] uppercase tracking-wider text-neutral-400 hover:text-neon-300"
+                  >
+                    📤
+                  </button>
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(item.id);
+                  }}
+                  className="rounded-full border border-warn-red/30 px-2 py-1 text-[10px] uppercase tracking-wider text-warn-red hover:bg-warn-red/10"
+                >
+                  {t.common.delete}
+                </button>
+              </div>
             </div>
           );
         })}
       </div>
+
+      {sharing && (
+        <ShareModal
+          name={sharing.name}
+          routine={sharing.routine}
+          onClose={() => setSharing(null)}
+        />
+      )}
     </div>
   );
 }

@@ -31,7 +31,6 @@ import {
 } from '../utils/strength.js';
 import { buildCooldown } from '../utils/cooldown.js';
 import { listLogs } from '../services/storageService.js';
-import { tagsForAvoidAreas } from '../data/conditions.js';
 
 const PAIN_AREAS = ['knee', 'lower_back', 'shoulder', 'wrist', 'elbow', 'hip', 'ankle'];
 

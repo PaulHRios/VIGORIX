@@ -96,7 +96,7 @@ export function ImportPage() {
           {data.name || t.saved.defaultName}
         </div>
         <div className="font-mono text-[11px] text-neutral-500">
-          {exCount} {t.common.sets.replace('series', 'ejercicios').replace('sets', 'exercises') /* heuristic */}
+          {exCount} {t.share.exercises}
         </div>
       </div>
 
