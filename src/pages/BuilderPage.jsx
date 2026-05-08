@@ -60,6 +60,13 @@ export function BuilderPage() {
   const [count, setCount] = useState(6);
   const [time, setTime] = useState(45);
   const [daysPerWeek, setDaysPerWeek] = useState(3);
+  const [travelMode, setTravelMode] = useState(false); // forces no-equipment
+
+  // Equipment used for generation (forced to 'none' when in travel mode).
+  const effectiveEquipment = useMemo(
+    () => (travelMode ? ['none'] : profile.equipment),
+    [travelMode, profile.equipment],
+  );
 
   // Generation result
   const [busy, setBusy] = useState(false);
@@ -116,7 +123,7 @@ export function BuilderPage() {
       {
         goal: profile.goal,
         level: profile.level,
-        equipment: profile.equipment,
+        equipment: effectiveEquipment,
         muscle,
         exerciseCount: count,
         time,
@@ -139,7 +146,7 @@ export function BuilderPage() {
       {
         goal: profile.goal,
         level: profile.level,
-        equipment: profile.equipment,
+        equipment: effectiveEquipment,
         daysPerWeek,
         exerciseCount: 6,
         sex: profile.sex,
@@ -257,7 +264,17 @@ export function BuilderPage() {
         ))}
 
         <div className="card space-y-2 p-4">
-          <button onClick={handleSaveAndPdfSingle} className="btn-primary w-full">
+          <button
+            onClick={() =>
+              navigate('/session', {
+                state: { routine, name: t.saved.defaultName },
+              })
+            }
+            className="btn-primary w-full text-base"
+          >
+            ▶ {t.session.start}
+          </button>
+          <button onClick={handleSaveAndPdfSingle} className="btn-ghost w-full">
             {savedFlash ? `✓ ${t.common.saved}` : t.saved.saveAndPdf}
           </button>
           <div className="flex gap-2">
@@ -311,15 +328,27 @@ export function BuilderPage() {
               ) : day.routine?.empty ? (
                 <p className="text-sm text-neutral-400">{t.weekly.rest}</p>
               ) : (
-                day.routine.exercises.map((ex, i) => (
-                  <ExerciseCard
-                    key={`${day.id}_${ex.id}_${i}`}
-                    exercise={ex}
-                    index={i}
-                    routine={day.routine}
-                    onReplace={() => handleReplaceWeekly(dayIndex, i)}
-                  />
-                ))
+                <>
+                  {day.routine.exercises.map((ex, i) => (
+                    <ExerciseCard
+                      key={`${day.id}_${ex.id}_${i}`}
+                      exercise={ex}
+                      index={i}
+                      routine={day.routine}
+                      onReplace={() => handleReplaceWeekly(dayIndex, i)}
+                    />
+                  ))}
+                  <button
+                    onClick={() =>
+                      navigate('/session', {
+                        state: { routine: weekly, dayIndex, name: t.saved.weeklyName },
+                      })
+                    }
+                    className="btn-primary w-full"
+                  >
+                    ▶ {t.session.startDay}
+                  </button>
+                </>
               )}
             </div>
           </details>
@@ -351,6 +380,37 @@ export function BuilderPage() {
       </header>
 
       <ProfileSummary profile={profile} t={t} lang={lang} onEdit={() => navigate('/onboarding')} />
+
+      {/* Travel mode — no equipment workout */}
+      <button
+        type="button"
+        onClick={() => setTravelMode((v) => !v)}
+        className={`flex w-full items-center justify-between rounded-2xl border p-3 text-left transition-colors ${
+          travelMode
+            ? 'border-warn-amber bg-warn-amber/10 text-warn-amber shadow-glow'
+            : 'border-white/10 bg-white/[0.02] text-neutral-300 hover:bg-white/[0.05]'
+        }`}
+      >
+        <div>
+          <div className="font-display text-xs uppercase tracking-wider">
+            ✈ {t.builder.travelMode}
+          </div>
+          <div className="mt-0.5 text-[11px] opacity-80">
+            {travelMode ? t.builder.travelOn : t.builder.travelOff}
+          </div>
+        </div>
+        <span
+          className={`grid h-6 w-10 shrink-0 place-items-center rounded-full transition-colors ${
+            travelMode ? 'bg-warn-amber' : 'bg-white/10'
+          }`}
+        >
+          <span
+            className={`h-4 w-4 rounded-full bg-ink-950 transition-transform ${
+              travelMode ? 'translate-x-2' : '-translate-x-2'
+            }`}
+          />
+        </span>
+      </button>
 
       {/* Type selection */}
       {!type && (

@@ -9,6 +9,8 @@ import { DietPage } from './pages/DietPage.jsx';
 import { SavedPage } from './pages/SavedPage.jsx';
 import { ProgressPage } from './pages/ProgressPage.jsx';
 import { AccountPage } from './pages/AccountPage.jsx';
+import { SessionPage } from './pages/SessionPage.jsx';
+import { ImportPage } from './pages/ImportPage.jsx';
 import { DisclaimerModal } from './components/DisclaimerModal.jsx';
 import { LanguageProvider } from './hooks/useLanguage.jsx';
 import { AuthProvider } from './hooks/useAuth.jsx';
@@ -24,6 +26,12 @@ export default function App() {
             <Routes>
               {/* Onboarding has its own full-screen layout (no nav bar) */}
               <Route path="/onboarding" element={<OnboardingPage />} />
+
+              {/* Session takes over the screen — no shared layout */}
+              <Route path="/session" element={<SessionPage />} />
+
+              {/* Import a shared routine via #/import?d=… */}
+              <Route path="/import" element={<ImportPage />} />
 
               {/* Everything else lives under the shared Layout */}
               <Route path="/" element={<Layout />}>

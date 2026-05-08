@@ -26,6 +26,13 @@ import {
   supplementGuidance,
 } from '../utils/dietGenerator.js';
 import { saveRoutine } from '../services/storageService.js';
+import { buildShoppingList, shoppingListAsText } from '../utils/shoppingList.js';
+import {
+  listFoodEntries,
+  addFoodEntry,
+  deleteFoodEntry,
+  totalsFor,
+} from '../services/dailyDietLog.js';
 
 const DAY_LABELS = {
   en: { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' },
@@ -393,6 +400,10 @@ export function DietPage() {
         ))}
       </div>
 
+      <ShoppingListCard plan={plan} t={t} lang={lang} />
+
+      <TodayFoodLogCard plan={plan} t={t} lang={lang} />
+
       <div className="card space-y-2 p-4">
         <button onClick={handleSavePlan} className="btn-primary w-full">
           {savedFlash ? `✓ ${t.common.saved}` : t.diet.savePlan}
@@ -461,5 +472,189 @@ function Stat({ label, value, small, accent }) {
         {label}
       </div>
     </div>
+  );
+}
+
+function ShoppingListCard({ plan, t, lang }) {
+  const [expanded, setExpanded] = useState(false);
+  const items = useMemo(() => buildShoppingList(plan, lang), [plan, lang]);
+
+  async function handleCopy() {
+    const text = shoppingListAsText(items, lang);
+    try {
+      await navigator.clipboard.writeText(text);
+      alert(t.share.copied);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return (
+    <section className="card overflow-hidden">
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-white/[0.02]"
+      >
+        <div>
+          <div className="heading-display text-base">🛒 {t.diet.shoppingList}</div>
+          <div className="font-mono text-[11px] text-neutral-500">
+            {items.length} {lang === 'es' ? 'productos' : 'items'}
+          </div>
+        </div>
+        <span className="text-neon-400">{expanded ? '▴' : '▾'}</span>
+      </button>
+
+      {expanded && (
+        <div className="space-y-1.5 border-t border-white/5 px-4 py-3">
+          {items.map((it) => (
+            <div
+              key={it.id}
+              className="flex items-baseline justify-between rounded-xl border border-white/5 bg-ink-800/30 px-3 py-2 text-sm"
+            >
+              <span className="truncate text-neutral-100">{it.name}</span>
+              <span className="ml-2 font-mono text-[11px] text-neutral-400">
+                × <span className="text-neon-300">{it.servings}</span> · {it.protein}g P
+              </span>
+            </div>
+          ))}
+          <button onClick={handleCopy} className="btn-ghost mt-2 w-full text-sm">
+            📋 {t.diet.shoppingCopy}
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function TodayFoodLogCard({ plan, t, lang }) {
+  const [entries, setEntries] = useState(() => listFoodEntries());
+  const [name, setName] = useState('');
+  const [kcal, setKcal] = useState('');
+  const [protein, setProtein] = useState('');
+  const [carbs, setCarbs] = useState('');
+  const [fat, setFat] = useState('');
+
+  function refresh() {
+    setEntries(listFoodEntries());
+  }
+
+  function handleAdd() {
+    if (!name && !kcal) return;
+    addFoodEntry({ name: name || 'Food', kcal, protein, carbs, fat });
+    setName('');
+    setKcal('');
+    setProtein('');
+    setCarbs('');
+    setFat('');
+    refresh();
+  }
+
+  function handleDelete(id) {
+    deleteFoodEntry(id);
+    refresh();
+  }
+
+  const totals = totalsFor();
+  const target = plan.targets;
+  const macros = plan.macros;
+  const remainKcal = Math.max(0, target.kcal - totals.kcal);
+  const remainProtein = Math.max(0, macros.protein - totals.protein);
+  const overKcal = totals.kcal > target.kcal;
+
+  return (
+    <section className="card p-4">
+      <h2 className="heading-display text-base">🍽 {t.diet.todayLog}</h2>
+      <p className="mt-1 text-[11px] text-neutral-500">{t.diet.todayLogHint}</p>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="rounded-2xl border border-white/5 bg-ink-800/40 p-3">
+          <div className="font-display text-[10px] uppercase tracking-wider text-neutral-500">
+            {t.diet.kcalRemaining}
+          </div>
+          <div className={`font-mono text-xl font-semibold tabular-nums ${overKcal ? 'text-warn-amber' : 'text-neon-300'}`}>
+            {overKcal ? '+' : ''}{Math.abs(target.kcal - totals.kcal)}
+          </div>
+          <div className="font-mono text-[10px] text-neutral-500">
+            {totals.kcal} / {target.kcal} kcal
+          </div>
+        </div>
+        <div className="rounded-2xl border border-white/5 bg-ink-800/40 p-3">
+          <div className="font-display text-[10px] uppercase tracking-wider text-neutral-500">
+            {t.diet.proteinRemaining}
+          </div>
+          <div className="font-mono text-xl font-semibold tabular-nums text-neon-300">
+            {remainProtein}g
+          </div>
+          <div className="font-mono text-[10px] text-neutral-500">
+            {totals.protein} / {macros.protein} g
+          </div>
+        </div>
+      </div>
+
+      {/* Quick-add form */}
+      <div className="mt-3 space-y-2 rounded-2xl border border-white/5 bg-ink-800/30 p-3">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={t.diet.foodName}
+          className="input py-2 text-sm"
+        />
+        <div className="grid grid-cols-4 gap-2">
+          <input
+            inputMode="numeric"
+            value={kcal}
+            onChange={(e) => setKcal(e.target.value)}
+            placeholder="kcal"
+            className="input py-2 text-center text-xs"
+          />
+          <input
+            inputMode="numeric"
+            value={protein}
+            onChange={(e) => setProtein(e.target.value)}
+            placeholder="P g"
+            className="input py-2 text-center text-xs"
+          />
+          <input
+            inputMode="numeric"
+            value={carbs}
+            onChange={(e) => setCarbs(e.target.value)}
+            placeholder="C g"
+            className="input py-2 text-center text-xs"
+          />
+          <input
+            inputMode="numeric"
+            value={fat}
+            onChange={(e) => setFat(e.target.value)}
+            placeholder="F g"
+            className="input py-2 text-center text-xs"
+          />
+        </div>
+        <button onClick={handleAdd} className="btn-primary w-full py-2 text-sm">
+          + {t.diet.logFood}
+        </button>
+      </div>
+
+      {/* Entries today */}
+      {entries.length > 0 && (
+        <ul className="mt-3 divide-y divide-white/5">
+          {entries.map((e) => (
+            <li key={e.id} className="flex items-center justify-between py-2">
+              <div className="min-w-0">
+                <div className="truncate text-sm text-neutral-100">{e.name}</div>
+                <div className="font-mono text-[10px] text-neutral-500">
+                  {e.kcal} kcal · {e.protein}g P
+                </div>
+              </div>
+              <button
+                onClick={() => handleDelete(e.id)}
+                className="ml-2 text-xs text-neutral-500 hover:text-warn-red"
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

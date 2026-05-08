@@ -12,6 +12,15 @@ import {
   idealWeightRange,
   toKg,
 } from '../services/userProfile.js';
+import { best1RM, detectPlateau, groupLogsByExercise } from '../utils/strength.js';
+import {
+  trainingStreak,
+  sessionsThisWeek,
+  lifetimeTotals,
+  listAchievements,
+  bodyWeightVs8w,
+  exerciseStrengthVs8w,
+} from '../utils/achievements.js';
 
 function formatDate(iso, lang) {
   if (!iso) return '';
@@ -127,8 +136,39 @@ export function ProgressPage() {
       name: items[0].exercise_name,
       latest: items[0],
       history: items.slice(0, 6),
+      best1RM: best1RM(items, key),
+      plateau: detectPlateau(items),
+      vs8w: exerciseStrengthVs8w(items, key),
     }));
   }, [filteredLogs, search]);
+
+  // ---- Streaks, achievements, 8-week comparisons ----
+  const streak = useMemo(() => trainingStreak(logs), [logs]);
+  const weekCount = useMemo(() => sessionsThisWeek(logs), [logs]);
+  const totals = useMemo(() => lifetimeTotals(logs), [logs]);
+  const achievements = useMemo(() => listAchievements(logs, body), [logs, body]);
+  const bw8w = useMemo(() => bodyWeightVs8w(body), [body]);
+
+  // Top exercises by total volume → show 1RM + plateau in their own card
+  const topExercises = useMemo(() => {
+    const groups = groupLogsByExercise(logs);
+    const enriched = [];
+    for (const [key, items] of groups.entries()) {
+      const vol = items.reduce(
+        (s, l) => s + (Number(l.weight) || 0) * (Number(l.reps) || 0),
+        0,
+      );
+      enriched.push({
+        key,
+        name: items[0].exercise_name,
+        totalVolume: vol,
+        best1RM: best1RM(items, key),
+        plateau: detectPlateau(items),
+        vs8w: exerciseStrengthVs8w(items, key),
+      });
+    }
+    return enriched.sort((a, b) => b.totalVolume - a.totalVolume).slice(0, 5);
+  }, [logs]);
 
   return (
     <div className="space-y-5 px-4 pt-4">
@@ -227,6 +267,122 @@ export function ProgressPage() {
         )}
       </section>
 
+      {/* Streaks & lifetime totals */}
+      <section className="card p-4">
+        <h2 className="mb-3 font-display text-sm uppercase tracking-[0.2em] text-neutral-400">
+          {t.progress.streakSection}
+        </h2>
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <Metric
+            label={t.progress.streak}
+            value={streak}
+            hint={lang === 'es' ? 'días seguidos' : 'days in a row'}
+            tone="text-neon-300"
+          />
+          <Metric
+            label={t.progress.thisWeek}
+            value={weekCount}
+            hint={lang === 'es' ? 'sesiones (7 días)' : 'sessions (7 days)'}
+          />
+          <Metric
+            label={t.progress.lifetimeVolume}
+            value={`${Math.round(totals.volume / 1000)}t`}
+            hint={`${totals.reps} reps`}
+          />
+        </div>
+        {bw8w && (
+          <div className="mt-3 rounded-2xl border border-white/5 bg-ink-800/40 p-3">
+            <div className="font-display text-[10px] uppercase tracking-wider text-neutral-500">
+              {t.progress.bodyWeightVs8w}
+            </div>
+            <div className="mt-1 flex items-baseline gap-2 font-mono">
+              <span className="text-base text-neutral-100">{bw8w.now} kg</span>
+              <span className={`text-xs ${bw8w.delta < 0 ? 'text-warn-amber' : 'text-neon-300'}`}>
+                {bw8w.delta > 0 ? '+' : ''}{bw8w.delta} kg ({bw8w.deltaPct > 0 ? '+' : ''}{bw8w.deltaPct}%)
+              </span>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Achievements */}
+      <section className="card p-4">
+        <h2 className="mb-3 font-display text-sm uppercase tracking-[0.2em] text-neutral-400">
+          {t.progress.achievements}
+        </h2>
+        <div className="grid grid-cols-2 gap-2">
+          {achievements.map((a) => {
+            const pct = Math.min(100, (a.value / a.target) * 100);
+            const label = lang === 'es' ? a.label_es : a.label_en;
+            return (
+              <div
+                key={a.id}
+                className={`rounded-2xl border p-2.5 transition-colors ${
+                  a.unlocked
+                    ? 'border-neon-500/40 bg-neon-500/10 text-neon-200 shadow-glow'
+                    : 'border-white/5 bg-ink-800/30 text-neutral-400'
+                }`}
+              >
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[11px] font-display">{a.unlocked ? '★' : '☆'} {label}</span>
+                  {!a.unlocked && (
+                    <span className="font-mono text-[10px] text-neutral-500">
+                      {Math.min(a.value, a.target)}/{a.target}
+                    </span>
+                  )}
+                </div>
+                {!a.unlocked && (
+                  <div className="mt-1 h-1 overflow-hidden rounded-full bg-white/5">
+                    <div className="h-full bg-neon-500/60" style={{ width: `${pct}%` }} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Top exercises with 1RM, plateau & 8w comparison */}
+      {topExercises.length > 0 && (
+        <section className="card p-4">
+          <h2 className="mb-3 font-display text-sm uppercase tracking-[0.2em] text-neutral-400">
+            {t.progress.topExercises}
+          </h2>
+          <ul className="space-y-2">
+            {topExercises.map((e) => (
+              <li key={e.key} className="rounded-2xl border border-white/5 bg-ink-800/30 p-3">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="truncate text-sm text-neutral-100">{e.name}</span>
+                  {e.best1RM && (
+                    <span className="font-mono text-xs text-neon-300">
+                      1RM ≈ {e.best1RM.value} kg
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px]">
+                  {e.vs8w && (
+                    <span
+                      className={`rounded-full border px-2 py-0.5 ${
+                        e.vs8w.delta > 0
+                          ? 'border-neon-500/30 bg-neon-500/10 text-neon-300'
+                          : 'border-warn-amber/30 bg-warn-amber/5 text-warn-amber'
+                      }`}
+                    >
+                      8w: {e.vs8w.delta > 0 ? '+' : ''}{e.vs8w.deltaPct}%
+                    </span>
+                  )}
+                  {e.plateau?.plateau && (
+                    <span className="rounded-full border border-warn-red/30 bg-warn-red/10 px-2 py-0.5 text-warn-red">
+                      ⚠ {t.progress.plateau}
+                    </span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {/* Recent logs + search */}
       <section className="card p-4">
         <div className="mb-3 flex items-center justify-between">
@@ -288,6 +444,29 @@ export function ProgressPage() {
                   <div className="mt-1 flex items-center justify-between text-[11px] text-neutral-500">
                     <span>{t.progress.lastTime}</span>
                     <span className="font-mono">{formatDate(g.latest.logged_at, lang)}</span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px]">
+                    {g.best1RM && (
+                      <span className="rounded-full border border-neon-500/30 bg-neon-500/5 px-2 py-0.5 text-neon-300">
+                        1RM ≈ {g.best1RM.value} kg
+                      </span>
+                    )}
+                    {g.vs8w && (
+                      <span
+                        className={`rounded-full border px-2 py-0.5 ${
+                          g.vs8w.delta > 0
+                            ? 'border-neon-500/30 bg-neon-500/10 text-neon-300'
+                            : 'border-warn-amber/30 bg-warn-amber/5 text-warn-amber'
+                        }`}
+                      >
+                        8w {g.vs8w.delta > 0 ? '+' : ''}{g.vs8w.deltaPct}%
+                      </span>
+                    )}
+                    {g.plateau?.plateau && (
+                      <span className="rounded-full border border-warn-red/30 bg-warn-red/10 px-2 py-0.5 text-warn-red">
+                        ⚠ {t.progress.plateau}
+                      </span>
+                    )}
                   </div>
                   {g.history.length > 1 && (
                     <details className="mt-2">

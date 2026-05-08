@@ -1,13 +1,16 @@
 // src/pages/SavedPage.jsx
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../hooks/useLanguage.jsx';
 import { listRoutines, deleteRoutine } from '../services/storageService.js';
 import { ExerciseCard } from '../components/ExerciseCard.jsx';
 import { WarningBanner } from '../components/WarningBanner.jsx';
 import { exportRoutinePdf } from '../utils/pdfExport.js';
+import { buildShareUrl } from '../utils/shareCodec.js';
 
 export function SavedPage() {
   const { t, lang } = useLanguage();
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [open, setOpen] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -34,6 +37,21 @@ export function SavedPage() {
     refresh();
   }
 
+  async function handleShare(item) {
+    const url = buildShareUrl(item.name, item.routine);
+    const data = { title: item.name, text: t.share.shareText, url };
+    try {
+      if (navigator.share) {
+        await navigator.share(data);
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      alert(t.share.copied);
+    } catch (e) {
+      // user dismissed share sheet — no-op
+    }
+  }
+
   // ---- DETAIL VIEW ----
   if (open) {
     const r = open.routine;
@@ -41,6 +59,7 @@ export function SavedPage() {
     const isExpertSingle = r?.type === 'expert_single';
     const isExpertWeekly = r?.type === 'expert_weekly';
     const isDiet = r?.type === 'diet_plan';
+    const startable = !isDiet; // diet plans don't have a session UI
 
     return (
       <div className="space-y-3 px-4 pt-4">
@@ -48,6 +67,25 @@ export function SavedPage() {
           ← {t.common.back}
         </button>
         <h2 className="heading-display text-2xl">{open.name}</h2>
+
+        {/* Start + Share top bar */}
+        <div className="flex gap-2">
+          {startable && !isWeekly && !isExpertWeekly && (
+            <button
+              onClick={() =>
+                navigate('/session', {
+                  state: { routine: r, name: open.name },
+                })
+              }
+              className="btn-primary flex-1"
+            >
+              ▶ {t.session.start}
+            </button>
+          )}
+          <button onClick={() => handleShare(open)} className="btn-ghost px-4">
+            📤 {t.share.share}
+          </button>
+        </div>
 
         {isExpertSingle && <ExpertSinglePreview routine={r} lang={lang} t={t} />}
         {isExpertWeekly && <ExpertWeeklyPreview routine={r} lang={lang} t={t} />}
@@ -66,14 +104,30 @@ export function SavedPage() {
                     <span className="text-neon-400">▾</span>
                   </summary>
                   <div className="space-y-3 border-t border-white/5 px-3 py-4">
-                    {day.routine?.exercises?.map((ex, i) => (
-                      <ExerciseCard
-                        key={`${day.id}_${ex.id}_${i}`}
-                        exercise={ex}
-                        index={i}
-                        routine={day.routine}
-                      />
-                    )) || <p className="text-sm text-neutral-500">{t.weekly.rest}</p>}
+                    {day.routine?.exercises?.length ? (
+                      <>
+                        {day.routine.exercises.map((ex, i) => (
+                          <ExerciseCard
+                            key={`${day.id}_${ex.id}_${i}`}
+                            exercise={ex}
+                            index={i}
+                            routine={day.routine}
+                          />
+                        ))}
+                        <button
+                          onClick={() =>
+                            navigate('/session', {
+                              state: { routine: r, dayIndex, name: open.name },
+                            })
+                          }
+                          className="btn-primary w-full"
+                        >
+                          ▶ {t.session.startDay}
+                        </button>
+                      </>
+                    ) : (
+                      <p className="text-sm text-neutral-500">{t.weekly.rest}</p>
+                    )}
                   </div>
                 </details>
               ))
